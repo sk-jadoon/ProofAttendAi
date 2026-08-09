@@ -1,0 +1,11 @@
+node_modules/
+.env
+.env.*
+!.env.example
+dist/
+client/dist/
+server/dist/
+blockchain/cache/
+blockchain/artifacts/
+coverage/
+*.log
