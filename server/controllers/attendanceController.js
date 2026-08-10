@@ -169,6 +169,13 @@ const lockSession = async (req, res) => {
       [id]
     );
 
+    if (records.length === 0) {
+  return res.status(400).json({
+    success: false,
+    message: "Cannot lock session: no attendance records found",
+  });
+}
+
     // 4. Create deterministic attendance data
     const attendanceData = JSON.stringify({
       session_id: Number(id),

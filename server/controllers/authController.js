@@ -1,5 +1,6 @@
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const { ethers } = require("ethers");
 const { pool } = require("../config/db");
 
 const createToken = (user) => {
@@ -48,19 +49,28 @@ const register = async (req, res) => {
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    const [result] = await pool.execute(
-      `INSERT INTO users (name, email, password, role)
-       VALUES (?, ?, ?, ?)`,
-      [name, email, hashedPassword, role]
-    );
+// Generate blockchain wallet automatically for students
+let walletAddress = null;
+
+if (role === "student") {
+  const wallet = ethers.Wallet.createRandom();
+  walletAddress = wallet.address;
+}
+
+const [result] = await pool.execute(
+  `INSERT INTO users
+   (name, email, password, role, wallet_address)
+   VALUES (?, ?, ?, ?, ?)`,
+  [name, email, hashedPassword, role, walletAddress]
+);
 
     const user = {
-      id: result.insertId,
-      name,
-      email,
-      role,
-      wallet_address: null,
-    };
+  id: result.insertId,
+  name,
+  email,
+  role,
+  wallet_address: walletAddress,
+};
 
     const token = createToken(user);
 
