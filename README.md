@@ -1,8 +1,8 @@
-ProofAttend AI
-
+**ProofAttend AI
+**
 A blockchain-based attendance management system that records attendance securely and issues an NFT as verifiable proof of attendance.
 
-Features
+**Features**
 Student, teacher, and admin authentication
 JWT-based authentication
 Teacher attendance session creation
@@ -20,7 +20,8 @@ React frontend
 Express.js backend
 Solidity smart contract
 Hardhat blockchain development environment
-Project Structure
+
+**Project Structure**
 ProofAttendAi/
 │
 ├── blockchain/
@@ -58,7 +59,8 @@ ProofAttendAi/
     │   └── assets/
     ├── package.json
     └── vite.config.js
-Technologies Used
+    
+**Technologies Used**
 Frontend
 React
 Vite
@@ -82,7 +84,7 @@ OpenZeppelin Contracts
 Ethereum-compatible local blockchain
 Prerequisites
 
-Install the following before running the project:
+**Install the following before running the project:**
 
 Node.js
 npm
@@ -98,7 +100,7 @@ Check npm:
 npm -v
 Installation
 
-Clone the project:
+**Clone the project:**
 
 git clone https://github.com/YOUR-USERNAME/ProofAttendAi.git
 cd ProofAttendAi
@@ -194,7 +196,7 @@ Copy the deployed contract address and add it to:
 ATTENDANCE_NFT_CONTRACT_ADDRESS=0x...
 Testing the Smart Contract
 
-Run:
+**Run:**
 
 cd blockchain
 npx hardhat test
@@ -274,8 +276,8 @@ Stored in MySQL
 API Endpoints
 Authentication
 
-Register:
-
+**Register:
+**
 POST /api/auth/register
 
 Login:
@@ -304,7 +306,7 @@ Get session:
 GET /api/attendance/sessions/:id
 Security
 
-ProofAttend AI uses multiple layers of protection:
+**ProofAttend AI uses multiple layers of protection:**
 
 Password hashing using bcrypt
 JWT authentication
@@ -374,7 +376,7 @@ License
 
 This project is developed for educational and project demonstration purposes.
 
-Quick Start
+**Quick Start**
 
 If everything is already configured:
 
