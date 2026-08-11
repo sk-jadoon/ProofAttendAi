@@ -17,6 +17,9 @@ contract AttendanceNFT is ERC721, Ownable {
     mapping(uint256 => AttendanceRecord) private attendanceRecords;
     mapping(uint256 => string) private metadataURIs;
 
+    // Attendance Hash => Token ID
+    mapping(bytes32 => uint256) private hashToTokenId;
+
     event AttendanceNFTMinted(
         uint256 indexed tokenId,
         uint256 indexed sessionId,
@@ -24,7 +27,10 @@ contract AttendanceNFT is ERC721, Ownable {
         bytes32 attendanceHash
     );
 
-    constructor() ERC721("ProofAttend Attendance", "PAT") Ownable(msg.sender) {}
+    constructor()
+        ERC721("ProofAttend Attendance", "PAT")
+        Ownable(msg.sender)
+    {}
 
     function mintAttendanceNFT(
         address student,
@@ -35,6 +41,12 @@ contract AttendanceNFT is ERC721, Ownable {
         require(student != address(0), "Invalid student address");
         require(sessionId > 0, "Invalid session ID");
         require(attendanceHash != bytes32(0), "Invalid attendance hash");
+
+        // Prevent duplicate attendance hashes
+        require(
+            hashToTokenId[attendanceHash] == 0,
+            "Attendance hash already exists"
+        );
 
         uint256 tokenId = _nextTokenId;
         _nextTokenId++;
@@ -50,6 +62,9 @@ contract AttendanceNFT is ERC721, Ownable {
             timestamp: block.timestamp
         });
 
+        // Save hash -> token ID
+        hashToTokenId[attendanceHash] = tokenId;
+
         emit AttendanceNFTMinted(
             tokenId,
             sessionId,
@@ -63,7 +78,10 @@ contract AttendanceNFT is ERC721, Ownable {
     function tokenURI(
         uint256 tokenId
     ) public view override returns (string memory) {
-        require(_ownerOf(tokenId) != address(0), "NFT does not exist");
+        require(
+            _ownerOf(tokenId) != address(0),
+            "NFT does not exist"
+        );
 
         return metadataURIs[tokenId];
     }
@@ -80,7 +98,10 @@ contract AttendanceNFT is ERC721, Ownable {
             uint256 timestamp
         )
     {
-        require(_ownerOf(tokenId) != address(0), "NFT does not exist");
+        require(
+            _ownerOf(tokenId) != address(0),
+            "NFT does not exist"
+        );
 
         AttendanceRecord memory record = attendanceRecords[tokenId];
 
@@ -89,6 +110,48 @@ contract AttendanceNFT is ERC721, Ownable {
             record.sessionId,
             record.student,
             record.timestamp
+        );
+    }
+
+    // Get token ID using attendance hash
+    function getTokenIdByHash(
+        bytes32 attendanceHash
+    ) external view returns (uint256) {
+        uint256 tokenId = hashToTokenId[attendanceHash];
+
+        require(tokenId != 0, "Attendance hash not found");
+
+        return tokenId;
+    }
+
+    // Directly get complete attendance record using hash
+    function getAttendanceByHash(
+        bytes32 attendanceHash
+    )
+        external
+        view
+        returns (
+            uint256 tokenId,
+            bytes32 returnedHash,
+            uint256 sessionId,
+            address student,
+            uint256 timestamp,
+            string memory metadataURI
+        )
+    {
+        tokenId = hashToTokenId[attendanceHash];
+
+        require(tokenId != 0, "Attendance hash not found");
+
+        AttendanceRecord memory record = attendanceRecords[tokenId];
+
+        return (
+            tokenId,
+            record.attendanceHash,
+            record.sessionId,
+            record.student,
+            record.timestamp,
+            metadataURIs[tokenId]
         );
     }
 }

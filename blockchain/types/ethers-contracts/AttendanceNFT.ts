@@ -6,14 +6,16 @@ import type { TypedContractEvent, TypedDeferredTopicFilter, TypedEventLog, Typed
   
 
   export interface AttendanceNFTInterface extends Interface {
-    getFunction(nameOrSignature: "approve" | "balanceOf" | "getApproved" | "getAttendanceRecord" | "isApprovedForAll" | "mintAttendanceNFT" | "name" | "owner" | "ownerOf" | "renounceOwnership" | "safeTransferFrom(address,address,uint256)" | "safeTransferFrom(address,address,uint256,bytes)" | "setApprovalForAll" | "supportsInterface" | "symbol" | "tokenURI" | "transferFrom" | "transferOwnership"): FunctionFragment;
+    getFunction(nameOrSignature: "approve" | "balanceOf" | "getApproved" | "getAttendanceByHash" | "getAttendanceRecord" | "getTokenIdByHash" | "isApprovedForAll" | "mintAttendanceNFT" | "name" | "owner" | "ownerOf" | "renounceOwnership" | "safeTransferFrom(address,address,uint256)" | "safeTransferFrom(address,address,uint256,bytes)" | "setApprovalForAll" | "supportsInterface" | "symbol" | "tokenURI" | "transferFrom" | "transferOwnership"): FunctionFragment;
 
     getEvent(nameOrSignatureOrTopic: "Approval" | "ApprovalForAll" | "AttendanceNFTMinted" | "OwnershipTransferred" | "Transfer"): EventFragment;
 
     encodeFunctionData(functionFragment: 'approve', values: [AddressLike, BigNumberish]): string;
 encodeFunctionData(functionFragment: 'balanceOf', values: [AddressLike]): string;
 encodeFunctionData(functionFragment: 'getApproved', values: [BigNumberish]): string;
+encodeFunctionData(functionFragment: 'getAttendanceByHash', values: [BytesLike]): string;
 encodeFunctionData(functionFragment: 'getAttendanceRecord', values: [BigNumberish]): string;
+encodeFunctionData(functionFragment: 'getTokenIdByHash', values: [BytesLike]): string;
 encodeFunctionData(functionFragment: 'isApprovedForAll', values: [AddressLike, AddressLike]): string;
 encodeFunctionData(functionFragment: 'mintAttendanceNFT', values: [AddressLike, BigNumberish, BytesLike, string]): string;
 encodeFunctionData(functionFragment: 'name', values?: undefined): string;
@@ -32,7 +34,9 @@ encodeFunctionData(functionFragment: 'transferOwnership', values: [AddressLike])
     decodeFunctionResult(functionFragment: 'approve', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'balanceOf', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'getApproved', data: BytesLike): Result;
+decodeFunctionResult(functionFragment: 'getAttendanceByHash', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'getAttendanceRecord', data: BytesLike): Result;
+decodeFunctionResult(functionFragment: 'getTokenIdByHash', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'isApprovedForAll', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'mintAttendanceNFT', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'name', data: BytesLike): Result;
@@ -168,9 +172,25 @@ decodeFunctionResult(functionFragment: 'transferOwnership', data: BytesLike): Re
     
 
     
+    getAttendanceByHash: TypedContractMethod<
+      [attendanceHash: BytesLike, ],
+      [[bigint, string, bigint, string, bigint, string] & {tokenId: bigint, returnedHash: string, sessionId: bigint, student: string, timestamp: bigint, metadataURI: string }],
+      'view'
+    >
+    
+
+    
     getAttendanceRecord: TypedContractMethod<
       [tokenId: BigNumberish, ],
       [[string, bigint, string, bigint] & {attendanceHash: string, sessionId: bigint, student: string, timestamp: bigint }],
+      'view'
+    >
+    
+
+    
+    getTokenIdByHash: TypedContractMethod<
+      [attendanceHash: BytesLike, ],
+      [bigint],
       'view'
     >
     
@@ -305,9 +325,19 @@ getFunction(nameOrSignature: 'getApproved'): TypedContractMethod<
       [string],
       'view'
     >;
+getFunction(nameOrSignature: 'getAttendanceByHash'): TypedContractMethod<
+      [attendanceHash: BytesLike, ],
+      [[bigint, string, bigint, string, bigint, string] & {tokenId: bigint, returnedHash: string, sessionId: bigint, student: string, timestamp: bigint, metadataURI: string }],
+      'view'
+    >;
 getFunction(nameOrSignature: 'getAttendanceRecord'): TypedContractMethod<
       [tokenId: BigNumberish, ],
       [[string, bigint, string, bigint] & {attendanceHash: string, sessionId: bigint, student: string, timestamp: bigint }],
+      'view'
+    >;
+getFunction(nameOrSignature: 'getTokenIdByHash'): TypedContractMethod<
+      [attendanceHash: BytesLike, ],
+      [bigint],
       'view'
     >;
 getFunction(nameOrSignature: 'isApprovedForAll'): TypedContractMethod<
