@@ -2,7 +2,6 @@ const { ethers } = require("ethers");
 
 // JSON artifact ko direct require karein taake Vercel build mein bundle ho jaye
 const AttendanceNFTArtifact = require("../../blockchain/artifacts/contracts/AttendanceNFT.sol/AttendanceNFT.json");
-
 const CONTRACT_ADDRESS = process.env.ATTENDANCE_NFT_CONTRACT_ADDRESS;
 const RPC_URL = process.env.BLOCKCHAIN_RPC_URL;
 const PRIVATE_KEY = process.env.BLOCKCHAIN_PRIVATE_KEY;
