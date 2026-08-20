@@ -1,0 +1,16 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "../client"
+		},
+		{
+			"path": "../node_modules"
+		},
+		{
+			"path": "../server"
+		}
+	]
+}

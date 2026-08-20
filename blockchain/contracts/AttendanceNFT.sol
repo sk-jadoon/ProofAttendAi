@@ -17,7 +17,7 @@ contract AttendanceNFT is ERC721, Ownable {
     mapping(uint256 => AttendanceRecord) private attendanceRecords;
     mapping(uint256 => string) private metadataURIs;
 
-    // Attendance Hash => Token ID
+    // Attendance hash => token ID
     mapping(bytes32 => uint256) private hashToTokenId;
 
     event AttendanceNFTMinted(
@@ -42,7 +42,6 @@ contract AttendanceNFT is ERC721, Ownable {
         require(sessionId > 0, "Invalid session ID");
         require(attendanceHash != bytes32(0), "Invalid attendance hash");
 
-        // Prevent duplicate attendance hashes
         require(
             hashToTokenId[attendanceHash] == 0,
             "Attendance hash already exists"
@@ -62,7 +61,6 @@ contract AttendanceNFT is ERC721, Ownable {
             timestamp: block.timestamp
         });
 
-        // Save hash -> token ID
         hashToTokenId[attendanceHash] = tokenId;
 
         emit AttendanceNFTMinted(
@@ -113,7 +111,6 @@ contract AttendanceNFT is ERC721, Ownable {
         );
     }
 
-    // Get token ID using attendance hash
     function getTokenIdByHash(
         bytes32 attendanceHash
     ) external view returns (uint256) {
@@ -124,7 +121,6 @@ contract AttendanceNFT is ERC721, Ownable {
         return tokenId;
     }
 
-    // Directly get complete attendance record using hash
     function getAttendanceByHash(
         bytes32 attendanceHash
     )
