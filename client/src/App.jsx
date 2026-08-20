@@ -16,7 +16,7 @@ import {
   BookOpen,
 } from "lucide-react";
 
-const API = "http://localhost:5000/api";
+const API = "https://proofattendai.netlify.app/api";
 
 const getToken = () => localStorage.getItem("token");
 const getUser = () => JSON.parse(localStorage.getItem("user") || "null");
