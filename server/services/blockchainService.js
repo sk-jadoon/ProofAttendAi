@@ -4,7 +4,7 @@ const CONTRACT_ADDRESS = process.env.ATTENDANCE_NFT_CONTRACT_ADDRESS;
 const RPC_URL = process.env.BLOCKCHAIN_RPC_URL;
 const PRIVATE_KEY = process.env.BLOCKCHAIN_PRIVATE_KEY;
 
-// Contract ABI (Inline to avoid file system issues on Vercel)
+// Directly inline ABI to avoid file path issues on Vercel deployment
 const ATTENDANCE_NFT_ABI = [
   {
     "inputs": [],
@@ -299,16 +299,8 @@ const ATTENDANCE_NFT_ABI = [
   }
 ];
 
-if (!CONTRACT_ADDRESS) {
-  throw new Error("ATTENDANCE_NFT_CONTRACT_ADDRESS is missing in .env");
-}
-
-if (!RPC_URL) {
-  throw new Error("BLOCKCHAIN_RPC_URL is missing in .env");
-}
-
-if (!PRIVATE_KEY) {
-  throw new Error("BLOCKCHAIN_PRIVATE_KEY is missing in .env");
+if (!CONTRACT_ADDRESS || !RPC_URL || !PRIVATE_KEY) {
+  throw new Error("Missing environment variables in .env file");
 }
 
 const provider = new ethers.JsonRpcProvider(RPC_URL);
@@ -346,19 +338,12 @@ async function mintAttendanceNFT({
     ethers.toUtf8Bytes(attendanceHash)
   );
 
-  console.log("Minting Attendance NFT...");
-  console.log("Student:", studentWallet);
-  console.log("Session:", sessionId);
-  console.log("Hash:", hashBytes32);
-
   const tx = await attendanceNFT.mintAttendanceNFT(
     studentWallet,
     Number(sessionId),
     hashBytes32,
     metadataURI
   );
-
-  console.log("Transaction sent:", tx.hash);
 
   const receipt = await tx.wait();
 
@@ -373,13 +358,13 @@ async function mintAttendanceNFT({
         break;
       }
     } catch (error) {
-      // Ignore logs belonging to other events
+      // Ignore non-matching logs
     }
   }
 
   if (tokenId === null) {
     throw new Error(
-      "NFT token ID was not found in blockchain transaction"
+      "NFT token ID was not found in transaction logs"
     );
   }
 
@@ -392,7 +377,6 @@ async function mintAttendanceNFT({
 
 async function getBlockchainInfo() {
   const network = await provider.getNetwork();
-
   const balance = await provider.getBalance(wallet.address);
 
   return {
