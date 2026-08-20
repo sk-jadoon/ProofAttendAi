@@ -1,59 +1,31 @@
 const { ethers } = require("ethers");
-const path = require("path");
-const fs = require("fs");
 
-const CONTRACT_ADDRESS =
-  process.env.ATTENDANCE_NFT_CONTRACT_ADDRESS;
+// JSON artifact ko direct require karein taake Vercel build mein bundle ho jaye
+const AttendanceNFTArtifact = require("../../blockchain/artifacts/contracts/AttendanceNFT.sol/AttendanceNFT.json");
 
-const RPC_URL =
-  process.env.BLOCKCHAIN_RPC_URL;
-
-const PRIVATE_KEY =
-  process.env.BLOCKCHAIN_PRIVATE_KEY;
+const CONTRACT_ADDRESS = process.env.ATTENDANCE_NFT_CONTRACT_ADDRESS;
+const RPC_URL = process.env.BLOCKCHAIN_RPC_URL;
+const PRIVATE_KEY = process.env.BLOCKCHAIN_PRIVATE_KEY;
 
 if (!CONTRACT_ADDRESS) {
-  throw new Error(
-    "ATTENDANCE_NFT_CONTRACT_ADDRESS is missing in .env"
-  );
+  throw new Error("ATTENDANCE_NFT_CONTRACT_ADDRESS is missing in .env");
 }
 
 if (!RPC_URL) {
-  throw new Error(
-    "BLOCKCHAIN_RPC_URL is missing in .env"
-  );
+  throw new Error("BLOCKCHAIN_RPC_URL is missing in .env");
 }
 
 if (!PRIVATE_KEY) {
-  throw new Error(
-    "BLOCKCHAIN_PRIVATE_KEY is missing in .env"
-  );
+  throw new Error("BLOCKCHAIN_PRIVATE_KEY is missing in .env");
 }
-
-const artifactPath = path.join(
-  __dirname,
-  "../../blockchain/artifacts/contracts/AttendanceNFT.sol/AttendanceNFT.json"
-);
-
-if (!fs.existsSync(artifactPath)) {
-  throw new Error(
-    `AttendanceNFT artifact not found: ${artifactPath}`
-  );
-}
-
-const artifact = JSON.parse(
-  fs.readFileSync(artifactPath, "utf8")
-);
 
 const provider = new ethers.JsonRpcProvider(RPC_URL);
 
-const wallet = new ethers.Wallet(
-  PRIVATE_KEY,
-  provider
-);
+const wallet = new ethers.Wallet(PRIVATE_KEY, provider);
 
 const attendanceNFT = new ethers.Contract(
   CONTRACT_ADDRESS,
-  artifact.abi,
+  AttendanceNFTArtifact.abi,
   wallet
 );
 
@@ -92,13 +64,12 @@ async function mintAttendanceNFT({
   console.log("Session:", sessionId);
   console.log("Hash:", hashBytes32);
 
-  const tx =
-    await attendanceNFT.mintAttendanceNFT(
-      studentWallet,
-      Number(sessionId),
-      hashBytes32,
-      metadataURI
-    );
+  const tx = await attendanceNFT.mintAttendanceNFT(
+    studentWallet,
+    Number(sessionId),
+    hashBytes32,
+    metadataURI
+  );
 
   console.log("Transaction sent:", tx.hash);
 
@@ -108,16 +79,10 @@ async function mintAttendanceNFT({
 
   for (const log of receipt.logs) {
     try {
-      const parsed =
-        attendanceNFT.interface.parseLog(log);
+      const parsed = attendanceNFT.interface.parseLog(log);
 
-      if (
-        parsed &&
-        parsed.name === "AttendanceNFTMinted"
-      ) {
-        tokenId =
-          parsed.args.tokenId.toString();
-
+      if (parsed && parsed.name === "AttendanceNFTMinted") {
+        tokenId = parsed.args.tokenId.toString();
         break;
       }
     } catch (error) {
@@ -141,8 +106,7 @@ async function mintAttendanceNFT({
 async function getBlockchainInfo() {
   const network = await provider.getNetwork();
 
-  const balance =
-    await provider.getBalance(wallet.address);
+  const balance = await provider.getBalance(wallet.address);
 
   return {
     walletAddress: wallet.address,
