@@ -10,14 +10,9 @@ const app = express();
 const allowedOrigins = [
   "https://proofattendai.netlify.app",
   "https://proof-attend-g39vuoazu-sidra13.vercel.app",
-  "https://proof-attend-ai-sx1w.vercel.app",
   "http://localhost:5173",
   "http://localhost:3000",
 ];
-
-/* =========================
-   CORS
-========================= */
 
 app.use(
   cors({
@@ -34,15 +29,7 @@ app.use(
   })
 );
 
-/* =========================
-   BODY PARSER
-========================= */
-
 app.use(express.json());
-
-/* =========================
-   ROOT
-========================= */
 
 app.get("/", (req, res) => {
   res.status(200).json({
@@ -50,10 +37,6 @@ app.get("/", (req, res) => {
     message: "ProofAttend AI API is running",
   });
 });
-
-/* =========================
-   DATABASE TEST
-========================= */
 
 app.get("/api/test-db", async (req, res) => {
   try {
@@ -65,7 +48,7 @@ app.get("/api/test-db", async (req, res) => {
       result: rows,
     });
   } catch (error) {
-    console.error("DATABASE ERROR:", error);
+    console.error("DB TEST ERROR:", error);
 
     return res.status(500).json({
       success: false,
@@ -76,47 +59,23 @@ app.get("/api/test-db", async (req, res) => {
   }
 });
 
-/* =========================
-   AUTH ROUTES
-========================= */
-
 app.use("/api/auth", authRoutes);
-
-/* =========================
-   ATTENDANCE ROUTES
-========================= */
-
 app.use("/api/attendance", attendanceRoutes);
 
-/* =========================
-   404
-========================= */
-
 app.use((req, res) => {
-  res.status(404).json({
+  return res.status(404).json({
     success: false,
     message: "API route not found",
     path: req.originalUrl,
   });
 });
 
-/* =========================
-   ERROR HANDLER
-========================= */
-
 app.use((err, req, res, next) => {
-  console.error("API Error:", err);
-
-  if (err.message === "Not allowed by CORS") {
-    return res.status(403).json({
-      success: false,
-      message: "CORS origin not allowed",
-    });
-  }
+  console.error("SERVER ERROR:", err);
 
   return res.status(500).json({
     success: false,
-    message: "Internal server error",
+    message: err.message || "Internal server error",
   });
 });
 
