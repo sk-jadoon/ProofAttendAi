@@ -9,7 +9,7 @@ const app = express();
 const allowedOrigins = [
   "https://proofattendai.netlify.app",
   "http://localhost:5173",
-  "http://localhost:3000",
+  "http://localhost:3000"
 ];
 
 app.use(
@@ -23,18 +23,16 @@ app.use(
     },
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
+    allowedHeaders: ["Content-Type", "Authorization"]
   })
 );
-
-app.options("*", cors());
 
 app.use(express.json());
 
 app.get("/", (req, res) => {
   res.json({
     success: true,
-    message: "ProofAttend AI API is running",
+    message: "ProofAttend AI API is running"
   });
 });
 
