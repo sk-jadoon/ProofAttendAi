@@ -2,7 +2,7 @@ const mysql = require("mysql2/promise");
 
 const pool = mysql.createPool({
   host: process.env.DB_HOST,
-  port: Number(process.env.DB_PORT),
+  port: Number(process.env.DB_PORT || 3306),
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME,
@@ -17,16 +17,16 @@ const pool = mysql.createPool({
 });
 
 const connectDB = async () => {
+  let connection;
+
   try {
-    const connection = await pool.getConnection();
+    connection = await pool.getConnection();
 
     console.log("=================================");
     console.log("MYSQL CONNECTED SUCCESSFULLY");
     console.log("Host:", process.env.DB_HOST);
     console.log("Database:", process.env.DB_NAME);
     console.log("=================================");
-
-    connection.release();
   } catch (error) {
     console.error("========== MYSQL ERROR ==========");
     console.error("Code:", error.code);
@@ -34,6 +34,10 @@ const connectDB = async () => {
     console.error("=================================");
 
     throw error;
+  } finally {
+    if (connection) {
+      connection.release();
+    }
   }
 };
 

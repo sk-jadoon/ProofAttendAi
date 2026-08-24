@@ -7,10 +7,18 @@ const {
   getSession,
 } = require("../controllers/attendanceController");
 
-const { protect, authorize } = require("../middleware/auth");
+const {
+  protect,
+  authorize,
+} = require("../middleware/auth");
 
 const router = express.Router();
 
+/*
+|--------------------------------------------------------------------------
+| Teacher/Admin creates attendance session
+|--------------------------------------------------------------------------
+*/
 router.post(
   "/sessions",
   protect,
@@ -18,6 +26,11 @@ router.post(
   createSession
 );
 
+/*
+|--------------------------------------------------------------------------
+| Student marks attendance
+|--------------------------------------------------------------------------
+*/
 router.post(
   "/mark",
   protect,
@@ -25,6 +38,11 @@ router.post(
   markAttendance
 );
 
+/*
+|--------------------------------------------------------------------------
+| Teacher/Admin locks attendance
+|--------------------------------------------------------------------------
+*/
 router.post(
   "/sessions/:id/lock",
   protect,
@@ -32,6 +50,11 @@ router.post(
   lockSession
 );
 
+/*
+|--------------------------------------------------------------------------
+| Get session + complete attendance records
+|--------------------------------------------------------------------------
+*/
 router.get(
   "/sessions/:id",
   protect,

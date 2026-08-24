@@ -17,9 +17,19 @@ const createToken = (user) => {
   );
 };
 
+/*
+|--------------------------------------------------------------------------
+| REGISTER
+|--------------------------------------------------------------------------
+*/
 const register = async (req, res) => {
   try {
-    const { name, email, password, role } = req.body;
+    const {
+      name,
+      email,
+      password,
+      role,
+    } = req.body;
 
     if (!name || !email || !password || !role) {
       return res.status(400).json({
@@ -35,9 +45,11 @@ const register = async (req, res) => {
       });
     }
 
+    const normalizedEmail = email.trim().toLowerCase();
+
     const [existingUsers] = await pool.execute(
-      "SELECT id FROM users WHERE email = ?",
-      [email]
+      "SELECT id FROM users WHERE email = ? LIMIT 1",
+      [normalizedEmail]
     );
 
     if (existingUsers.length > 0) {
@@ -49,28 +61,51 @@ const register = async (req, res) => {
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-// Generate blockchain wallet automatically for students
-let walletAddress = null;
+    /*
+    |--------------------------------------------------------------------------
+    | Generate blockchain wallet for student
+    |--------------------------------------------------------------------------
+    */
 
-if (role === "student") {
-  const wallet = ethers.Wallet.createRandom();
-  walletAddress = wallet.address;
-}
+    let walletAddress = null;
 
-const [result] = await pool.execute(
-  `INSERT INTO users
-   (name, email, password, role, wallet_address)
-   VALUES (?, ?, ?, ?, ?)`,
-  [name, email, hashedPassword, role, walletAddress]
-);
+    if (role === "student") {
+      const wallet = ethers.Wallet.createRandom();
+      walletAddress = wallet.address;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Insert user
+    |--------------------------------------------------------------------------
+    */
+
+    const [result] = await pool.execute(
+      `INSERT INTO users
+       (
+         name,
+         email,
+         password,
+         role,
+         wallet_address
+       )
+       VALUES (?, ?, ?, ?, ?)`,
+      [
+        name.trim(),
+        normalizedEmail,
+        hashedPassword,
+        role,
+        walletAddress,
+      ]
+    );
 
     const user = {
-  id: result.insertId,
-  name,
-  email,
-  role,
-  wallet_address: walletAddress,
-};
+      id: result.insertId,
+      name: name.trim(),
+      email: normalizedEmail,
+      role,
+      wallet_address: walletAddress,
+    };
 
     const token = createToken(user);
 
@@ -90,9 +125,17 @@ const [result] = await pool.execute(
   }
 };
 
+/*
+|--------------------------------------------------------------------------
+| LOGIN
+|--------------------------------------------------------------------------
+*/
 const login = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const {
+      email,
+      password,
+    } = req.body;
 
     if (!email || !password) {
       return res.status(400).json({
@@ -101,9 +144,11 @@ const login = async (req, res) => {
       });
     }
 
+    const normalizedEmail = email.trim().toLowerCase();
+
     const [users] = await pool.execute(
-      "SELECT * FROM users WHERE email = ?",
-      [email]
+      "SELECT * FROM users WHERE email = ? LIMIT 1",
+      [normalizedEmail]
     );
 
     if (users.length === 0) {
@@ -153,12 +198,24 @@ const login = async (req, res) => {
   }
 };
 
+/*
+|--------------------------------------------------------------------------
+| GET CURRENT USER
+|--------------------------------------------------------------------------
+*/
 const getMe = async (req, res) => {
   try {
     const [users] = await pool.execute(
-      `SELECT id, name, email, role, wallet_address, created_at
+      `SELECT
+         id,
+         name,
+         email,
+         role,
+         wallet_address,
+         created_at
        FROM users
-       WHERE id = ?`,
+       WHERE id = ?
+       LIMIT 1`,
       [req.user.id]
     );
 

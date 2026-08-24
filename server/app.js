@@ -6,20 +6,31 @@ const attendanceRoutes = require("./routes/attendanceRoutes");
 
 const app = express();
 
-// =========================
-// CORS
-// =========================
+/*
+|--------------------------------------------------------------------------
+| CORS
+|--------------------------------------------------------------------------
+*/
 
 const allowedOrigins = [
-  "https://proof-attend-ai.vercel.app",
   "https://proofattendai.netlify.app",
+  "https://proof-attend-ai.vercel.app",
+  "https://proof-attend-g39vuoazu-sidra13.vercel.app",
+
+  // Local development
+  "http://localhost:5173",
+  "http://localhost:3000",
 ];
 
 app.use(
   cors({
     origin: function (origin, callback) {
-      // Allow requests without an origin
-      // (for example, server-to-server requests)
+      /*
+      |----------------------------------------------------------------------
+      | Allow requests without Origin
+      |----------------------------------------------------------------------
+      */
+
       if (!origin) {
         return callback(null, true);
       }
@@ -28,39 +39,79 @@ app.use(
         return callback(null, true);
       }
 
-      return callback(new Error("Not allowed by CORS"));
+      console.error(
+        "CORS blocked origin:",
+        origin
+      );
+
+      return callback(
+        new Error(
+          `Not allowed by CORS: ${origin}`
+        )
+      );
     },
+
     credentials: true,
+
+    methods: [
+      "GET",
+      "POST",
+      "PUT",
+      "PATCH",
+      "DELETE",
+      "OPTIONS",
+    ],
+
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+    ],
   })
 );
 
-// =========================
-// MIDDLEWARE
-// =========================
+/*
+|--------------------------------------------------------------------------
+| Middleware
+|--------------------------------------------------------------------------
+*/
 
 app.use(express.json());
 
-// =========================
-// API TEST
-// =========================
+/*
+|--------------------------------------------------------------------------
+| API Health Check
+|--------------------------------------------------------------------------
+*/
 
 app.get("/", (req, res) => {
-  res.json({
+  res.status(200).json({
     success: true,
-    message: "ProofAttend AI API is running",
+    message:
+      "ProofAttend AI API is running",
   });
 });
 
-// =========================
-// ROUTES
-// =========================
+/*
+|--------------------------------------------------------------------------
+| Routes
+|--------------------------------------------------------------------------
+*/
 
-app.use("/api/auth", authRoutes);
-app.use("/api/attendance", attendanceRoutes);
+app.use(
+  "/api/auth",
+  authRoutes
+);
 
-// =========================
-// 404 HANDLER
-// =========================
+app.use(
+  "/api/attendance",
+  attendanceRoutes
+);
+
+/*
+|--------------------------------------------------------------------------
+| 404
+|--------------------------------------------------------------------------
+*/
 
 app.use((req, res) => {
   res.status(404).json({
@@ -70,17 +121,28 @@ app.use((req, res) => {
   });
 });
 
-// =========================
-// ERROR HANDLER
-// =========================
+/*
+|--------------------------------------------------------------------------
+| Error Handler
+|--------------------------------------------------------------------------
+*/
 
-app.use((err, req, res, next) => {
-  console.error("API Error:", err);
+app.use(
+  (err, req, res, next) => {
+    console.error(
+      "SERVER ERROR:",
+      err
+    );
 
-  res.status(err.status || 500).json({
-    success: false,
-    message: err.message || "Internal server error",
-  });
-});
+    res.status(
+      err.status || 500
+    ).json({
+      success: false,
+      message:
+        err.message ||
+        "Internal server error",
+      });
+  }
+);
 
 module.exports = app;

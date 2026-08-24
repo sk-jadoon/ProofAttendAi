@@ -1,91 +1,66 @@
-import { network } from "hardhat";
-import { ethers } from "ethers";
+const hre = require("hardhat");
 
 async function main() {
-  const { ethers: hardhatEthers } = await network.connect();
+  console.log("======================================");
+  console.log("Deploying AttendanceNFT...");
+  console.log("======================================");
 
-  console.log("Deploying AttendanceNFT to Sepolia...");
+  const [deployer] = await hre.ethers.getSigners();
 
-  const privateKey = process.env.PRIVATE_KEY;
+  console.log("Deployer address:");
+  console.log(deployer.address);
 
-  if (!privateKey) {
-    throw new Error(
-      "PRIVATE_KEY is missing from blockchain/.env"
-    );
-  }
+  const balance = await hre.ethers.provider.getBalance(deployer.address);
 
-  const rpcUrl = process.env.SEPOLIA_RPC_URL;
+  console.log("Deployer balance:");
+  console.log(hre.ethers.formatEther(balance), "ETH");
 
-  if (!rpcUrl) {
-    throw new Error(
-      "SEPOLIA_RPC_URL is missing from blockchain/.env"
-    );
-  }
+  console.log("--------------------------------------");
 
-  // Connect directly to Sepolia
-  const provider = new ethers.JsonRpcProvider(rpcUrl);
-
-  // Create deployer wallet
-  const deployer = new ethers.Wallet(
-    privateKey,
-    provider
+  const AttendanceNFT = await hre.ethers.getContractFactory(
+    "AttendanceNFT"
   );
 
-  console.log("Deployer address:", deployer.address);
+  const contract = await AttendanceNFT.deploy();
 
-  const balance =
-    await provider.getBalance(deployer.address);
+  console.log("Waiting for deployment...");
 
-  console.log(
-    "Deployer balance:",
-    ethers.formatEther(balance),
-    "ETH"
-  );
+  await contract.waitForDeployment();
 
-  if (balance === 0n) {
-    throw new Error(
-      "Deployer wallet has no Sepolia ETH."
-    );
-  }
+  const contractAddress = await contract.getAddress();
 
-  // Get contract factory using Hardhat artifact
-  const AttendanceNFT =
-    await hardhatEthers.getContractFactory(
-      "AttendanceNFT"
-    );
-
-  // Attach our Sepolia wallet as signer
-  const factory =
-    AttendanceNFT.connect(deployer);
-
-  console.log("Sending deployment transaction...");
-
-  const attendanceNFT =
-    await factory.deploy();
-
-  console.log(
-    "Transaction hash:",
-    attendanceNFT.deploymentTransaction()?.hash
-  );
-
-  await attendanceNFT.waitForDeployment();
-
-  const contractAddress =
-    await attendanceNFT.getAddress();
+  const ownerAddress = await contract.owner();
 
   console.log("");
-  console.log("====================================");
-  console.log("AttendanceNFT deployed successfully");
-  console.log("====================================");
-  console.log("Contract Address:", contractAddress);
-  console.log("Deployer:", deployer.address);
-  console.log("Network: Ethereum Sepolia");
-  console.log("====================================");
+  console.log("======================================");
+  console.log("DEPLOYMENT SUCCESSFUL");
+  console.log("======================================");
+
+  console.log("CONTRACT_ADDRESS=");
+  console.log(contractAddress);
+
+  console.log("OWNER_ADDRESS=");
+  console.log(ownerAddress);
+
+  console.log("DEPLOYER_ADDRESS=");
+  console.log(deployer.address);
+
+  console.log("======================================");
+
+  if (
+    ownerAddress.toLowerCase() === deployer.address.toLowerCase()
+  ) {
+    console.log("OWNER CHECK: PASS");
+  } else {
+    console.log("OWNER CHECK: FAILED");
+  }
+
+  console.log("======================================");
 }
 
 main().catch((error) => {
   console.error("");
-  console.error("Deployment failed:");
+  console.error("DEPLOYMENT FAILED");
   console.error(error);
   process.exitCode = 1;
 });
