@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { BrowserProvider } from "ethers";
 import {
   BrowserRouter,
   Routes,
@@ -28,6 +29,29 @@ const getToken = () => localStorage.getItem("token");
 
 const getUser = () =>
   JSON.parse(localStorage.getItem("user") || "null");
+
+async function connectWallet() {
+  if (!window.ethereum) {
+    alert("MetaMask is not installed.");
+    return null;
+  }
+
+  try {
+    const provider = new BrowserProvider(window.ethereum);
+
+    await provider.send("eth_requestAccounts", []);
+
+    const signer = await provider.getSigner();
+    const address = await signer.getAddress();
+
+    localStorage.setItem("walletAddress", address);
+
+    return address;
+  } catch (error) {
+    console.error("Wallet connection error:", error);
+    return null;
+  }
+}
 
 async function api(path, options = {}) {
   const response = await fetch(`${API}${path}`, {
@@ -272,9 +296,27 @@ function Layout({ children }) {
 
   const user = getUser();
 
+  const [walletAddress, setWalletAddress] = useState(
+    localStorage.getItem("walletAddress") || ""
+  );
+
+  const handleConnectWallet = async () => {
+    const address = await connectWallet();
+
+    if (address) {
+      setWalletAddress(address);
+    }
+  };
+
+  const disconnectWallet = () => {
+    localStorage.removeItem("walletAddress");
+    setWalletAddress("");
+  };
+
   const logout = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
+    localStorage.removeItem("walletAddress");
 
     navigate("/login");
   };
@@ -320,6 +362,44 @@ function Layout({ children }) {
 
             <span>{user?.role}</span>
           </div>
+        </div>
+
+        <div style={{ padding: "10px 12px" }}>
+          {!walletAddress ? (
+            <button
+              className="secondary-btn"
+              onClick={handleConnectWallet}
+              style={{
+                width: "100%",
+                margin: "0",
+                background: "#3159d9",
+                color: "white",
+              }}
+            >
+              Connect Wallet
+            </button>
+          ) : (
+            <>
+              <div
+                style={{
+                  color: "#9ca8bc",
+                  fontSize: "12px",
+                  marginBottom: "8px",
+                  wordBreak: "break-all",
+                }}
+              >
+                {walletAddress.slice(0, 6)}...
+                {walletAddress.slice(-4)}
+              </div>
+
+              <button
+                className="logout-btn"
+                onClick={disconnectWallet}
+              >
+                Disconnect Wallet
+              </button>
+            </>
+          )}
         </div>
 
         <button
