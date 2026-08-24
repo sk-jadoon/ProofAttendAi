@@ -5,6 +5,7 @@ const {
   markAttendance,
   lockSession,
   getSession,
+  connectWallet,
 } = require("../controllers/attendanceController");
 
 const {
@@ -28,6 +29,18 @@ router.post(
 
 /*
 |--------------------------------------------------------------------------
+| Student connects MetaMask wallet
+|--------------------------------------------------------------------------
+*/
+router.post(
+  "/wallet/connect",
+  protect,
+  authorize("student"),
+  connectWallet
+);
+
+/*
+|--------------------------------------------------------------------------
 | Student marks attendance
 |--------------------------------------------------------------------------
 */
@@ -40,7 +53,7 @@ router.post(
 
 /*
 |--------------------------------------------------------------------------
-| Teacher/Admin locks attendance
+| Teacher/Admin locks attendance + mints NFTs
 |--------------------------------------------------------------------------
 */
 router.post(
@@ -52,7 +65,7 @@ router.post(
 
 /*
 |--------------------------------------------------------------------------
-| Get session + complete attendance records
+| Get complete session + attendance records
 |--------------------------------------------------------------------------
 */
 router.get(

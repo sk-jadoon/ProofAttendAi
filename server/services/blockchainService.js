@@ -1,5 +1,10 @@
 const { ethers } = require("ethers");
 
+/*
+|--------------------------------------------------------------------------
+| ENVIRONMENT VARIABLES
+|--------------------------------------------------------------------------
+*/
 const CONTRACT_ADDRESS =
   process.env.ATTENDANCE_NFT_CONTRACT_ADDRESS;
 
@@ -9,6 +14,11 @@ const RPC_URL =
 const PRIVATE_KEY =
   process.env.BLOCKCHAIN_PRIVATE_KEY;
 
+/*
+|--------------------------------------------------------------------------
+| Validate ENV
+|--------------------------------------------------------------------------
+*/
 if (!CONTRACT_ADDRESS) {
   throw new Error(
     "ATTENDANCE_NFT_CONTRACT_ADDRESS is missing"
@@ -33,15 +43,35 @@ if (!ethers.isAddress(CONTRACT_ADDRESS)) {
   );
 }
 
+/*
+|--------------------------------------------------------------------------
+| Provider
+|--------------------------------------------------------------------------
+*/
 const provider =
-  new ethers.JsonRpcProvider(RPC_URL);
+  new ethers.JsonRpcProvider(
+    RPC_URL
+  );
 
+/*
+|--------------------------------------------------------------------------
+| Backend blockchain wallet
+|--------------------------------------------------------------------------
+|
+| THIS wallet pays gas and must be the owner of AttendanceNFT contract.
+|
+*/
 const wallet =
   new ethers.Wallet(
     PRIVATE_KEY,
     provider
   );
 
+/*
+|--------------------------------------------------------------------------
+| AttendanceNFT ABI
+|--------------------------------------------------------------------------
+*/
 const ATTENDANCE_NFT_ABI = [
   {
     inputs: [
@@ -245,6 +275,11 @@ const ATTENDANCE_NFT_ABI = [
   },
 ];
 
+/*
+|--------------------------------------------------------------------------
+| Contract
+|--------------------------------------------------------------------------
+*/
 const attendanceNFT =
   new ethers.Contract(
     CONTRACT_ADDRESS,
@@ -254,7 +289,7 @@ const attendanceNFT =
 
 /*
 |--------------------------------------------------------------------------
-| Mint Attendance NFT
+| MINT ATTENDANCE NFT
 |--------------------------------------------------------------------------
 */
 async function mintAttendanceNFT({
@@ -263,12 +298,22 @@ async function mintAttendanceNFT({
   attendanceHash,
   metadataURI,
 }) {
+  /*
+  |--------------------------------------------------------------------------
+  | Validate student wallet
+  |--------------------------------------------------------------------------
+  */
   if (!ethers.isAddress(studentWallet)) {
     throw new Error(
       "Invalid student wallet address"
     );
   }
 
+  /*
+  |--------------------------------------------------------------------------
+  | Validate session
+  |--------------------------------------------------------------------------
+  */
   if (
     !sessionId ||
     Number(sessionId) <= 0
@@ -278,12 +323,27 @@ async function mintAttendanceNFT({
     );
   }
 
-  if (!attendanceHash) {
+  /*
+  |--------------------------------------------------------------------------
+  | Validate hash
+  |--------------------------------------------------------------------------
+  */
+  if (
+    !attendanceHash ||
+    !/^[a-fA-F0-9]{64}$/.test(
+      attendanceHash
+    )
+  ) {
     throw new Error(
-      "Attendance hash is required"
+      "Invalid attendance SHA-256 hash"
     );
   }
 
+  /*
+  |--------------------------------------------------------------------------
+  | Validate metadata
+  |--------------------------------------------------------------------------
+  */
   if (!metadataURI) {
     throw new Error(
       "Metadata URI is required"
@@ -292,22 +352,26 @@ async function mintAttendanceNFT({
 
   /*
   |--------------------------------------------------------------------------
-  | Convert SHA-256 hex string into bytes32
+  | Convert SHA256 -> bytes32
   |--------------------------------------------------------------------------
   */
-
   const hashBytes32 =
-    ethers.hexlify(
-      ethers.toBeArray(
-        "0x" + attendanceHash
-      )
-    );
+    "0x" + attendanceHash;
 
   /*
   |--------------------------------------------------------------------------
-  | Send transaction
+  | Send blockchain transaction
   |--------------------------------------------------------------------------
   */
+  console.log(
+    "Sending NFT transaction:",
+    {
+      studentWallet,
+      sessionId,
+      contract: CONTRACT_ADDRESS,
+      backendWallet: wallet.address,
+    }
+  );
 
   const tx =
     await attendanceNFT.mintAttendanceNFT(
@@ -322,6 +386,11 @@ async function mintAttendanceNFT({
     tx.hash
   );
 
+  /*
+  |--------------------------------------------------------------------------
+  | Wait for confirmation
+  |--------------------------------------------------------------------------
+  */
   const receipt =
     await tx.wait();
 
@@ -333,10 +402,9 @@ async function mintAttendanceNFT({
 
   /*
   |--------------------------------------------------------------------------
-  | Extract token ID from AttendanceNFTMinted event
+  | Find AttendanceNFTMinted event
   |--------------------------------------------------------------------------
   */
-
   let tokenId = null;
 
   for (const log of receipt.logs) {
@@ -349,7 +417,8 @@ async function mintAttendanceNFT({
 
       if (
         parsed &&
-        parsed.name === "AttendanceNFTMinted"
+        parsed.name ===
+          "AttendanceNFTMinted"
       ) {
         tokenId =
           parsed.args.tokenId.toString();
@@ -357,26 +426,57 @@ async function mintAttendanceNFT({
         break;
       }
     } catch (error) {
-      // Ignore unrelated logs
+      /*
+      | Ignore logs belonging to other contracts
+      */
+    }
+  }
+
+  /*
+  |--------------------------------------------------------------------------
+  | Fallback: use return value through static call
+  |--------------------------------------------------------------------------
+  */
+  if (tokenId === null) {
+    try {
+      const predictedTokenId =
+        await attendanceNFT.mintAttendanceNFT.staticCall(
+          studentWallet,
+          Number(sessionId),
+          hashBytes32,
+          metadataURI
+        );
+
+      tokenId =
+        predictedTokenId.toString();
+    } catch (error) {
+      console.error(
+        "Could not obtain token ID:",
+        error.message
+      );
     }
   }
 
   if (tokenId === null) {
     throw new Error(
-      "NFT token ID was not found in transaction logs"
+      "NFT transaction succeeded but token ID could not be determined"
     );
   }
 
   return {
-    transactionHash: receipt.hash,
-    contractAddress: CONTRACT_ADDRESS,
+    transactionHash:
+      receipt.hash,
+
+    contractAddress:
+      CONTRACT_ADDRESS,
+
     tokenId,
   };
 }
 
 /*
 |--------------------------------------------------------------------------
-| Blockchain information
+| GET BLOCKCHAIN INFORMATION
 |--------------------------------------------------------------------------
 */
 async function getBlockchainInfo() {
@@ -399,7 +499,9 @@ async function getBlockchainInfo() {
       network.chainId.toString(),
 
     balance:
-      ethers.formatEther(balance),
+      ethers.formatEther(
+        balance
+      ),
 
     contractAddress:
       CONTRACT_ADDRESS,
