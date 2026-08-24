@@ -1,7 +1,14 @@
-import { useEffect, useState } from "react";
-import { BrowserRouter, Routes, Route, Navigate, Link, useNavigate } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  Navigate,
+  Link,
+  useNavigate,
+} from "react-router-dom";
 import { QRCodeCanvas } from "qrcode.react";
-import { Html5QrcodeScanner } from "html5-qrcode";
+import { Html5Qrcode } from "html5-qrcode";
 import {
   ShieldCheck,
   LayoutDashboard,
@@ -11,7 +18,6 @@ import {
   Plus,
   Lock,
   CheckCircle,
-  Wallet,
   Clock,
   BookOpen,
 } from "lucide-react";
@@ -19,14 +25,18 @@ import {
 const API = "https://proof-attend-ai-sx1w.vercel.app/api";
 
 const getToken = () => localStorage.getItem("token");
-const getUser = () => JSON.parse(localStorage.getItem("user") || "null");
+
+const getUser = () =>
+  JSON.parse(localStorage.getItem("user") || "null");
 
 async function api(path, options = {}) {
   const response = await fetch(`${API}${path}`, {
     ...options,
     headers: {
       "Content-Type": "application/json",
-      ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}),
+      ...(getToken()
+        ? { Authorization: `Bearer ${getToken()}` }
+        : {}),
       ...(options.headers || {}),
     },
   });
@@ -40,9 +50,9 @@ async function api(path, options = {}) {
   return data;
 }
 
-/* =========================
-   AUTH
-========================= */
+/* =========================================================
+   AUTH - LOGIN
+========================================================= */
 
 function Login() {
   const navigate = useNavigate();
@@ -54,13 +64,17 @@ function Login() {
 
   const submit = async (e) => {
     e.preventDefault();
+
     setLoading(true);
     setError("");
 
     try {
       const data = await api("/auth/login", {
         method: "POST",
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({
+          email,
+          password,
+        }),
       });
 
       localStorage.setItem("token", data.token);
@@ -82,10 +96,14 @@ function Login() {
         </div>
 
         <h1>ProofAttend</h1>
-        <p className="muted">Blockchain Attendance Management</p>
+
+        <p className="muted">
+          Blockchain Attendance Management
+        </p>
 
         <form onSubmit={submit}>
           <label>Email</label>
+
           <input
             type="email"
             placeholder="Enter your email"
@@ -95,6 +113,7 @@ function Login() {
           />
 
           <label>Password</label>
+
           <input
             type="password"
             placeholder="Enter your password"
@@ -105,7 +124,10 @@ function Login() {
 
           {error && <div className="error">{error}</div>}
 
-          <button className="primary-btn" disabled={loading}>
+          <button
+            className="primary-btn"
+            disabled={loading}
+          >
             {loading ? "Logging in..." : "Login"}
           </button>
         </form>
@@ -118,6 +140,10 @@ function Login() {
     </div>
   );
 }
+
+/* =========================================================
+   AUTH - REGISTER
+========================================================= */
 
 function Register() {
   const navigate = useNavigate();
@@ -141,6 +167,7 @@ function Register() {
 
   const submit = async (e) => {
     e.preventDefault();
+
     setLoading(true);
     setError("");
 
@@ -166,10 +193,14 @@ function Register() {
         </div>
 
         <h1>Create Account</h1>
-        <p className="muted">Join ProofAttend</p>
+
+        <p className="muted">
+          Join ProofAttend
+        </p>
 
         <form onSubmit={submit}>
           <label>Name</label>
+
           <input
             name="name"
             placeholder="Full name"
@@ -179,6 +210,7 @@ function Register() {
           />
 
           <label>Email</label>
+
           <input
             name="email"
             type="email"
@@ -189,6 +221,7 @@ function Register() {
           />
 
           <label>Password</label>
+
           <input
             name="password"
             type="password"
@@ -199,37 +232,50 @@ function Register() {
           />
 
           <label>Role</label>
-          <select name="role" value={form.role} onChange={change}>
+
+          <select
+            name="role"
+            value={form.role}
+            onChange={change}
+          >
             <option value="student">Student</option>
             <option value="teacher">Teacher</option>
           </select>
 
           {error && <div className="error">{error}</div>}
 
-          <button className="primary-btn" disabled={loading}>
-            {loading ? "Creating..." : "Create Account"}
+          <button
+            className="primary-btn"
+            disabled={loading}
+          >
+            {loading
+              ? "Creating..."
+              : "Create Account"}
           </button>
         </form>
 
         <p className="bottom-text">
-          Already registered? <Link to="/login">Login</Link>
+          Already registered?{" "}
+          <Link to="/login">Login</Link>
         </p>
       </div>
     </div>
   );
 }
 
-/* =========================
+/* =========================================================
    LAYOUT
-========================= */
+========================================================= */
 
 function Layout({ children }) {
   const navigate = useNavigate();
+
   const user = getUser();
 
   const logout = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
+
     navigate("/login");
   };
 
@@ -238,6 +284,7 @@ function Layout({ children }) {
       <aside className="sidebar">
         <div className="brand">
           <ShieldCheck size={28} />
+
           <span>ProofAttend</span>
         </div>
 
@@ -254,7 +301,8 @@ function Layout({ children }) {
             </Link>
           )}
 
-          {(user?.role === "teacher" || user?.role === "admin") && (
+          {(user?.role === "teacher" ||
+            user?.role === "admin") && (
             <Link to="/teacher">
               <BookOpen size={22} />
               Teacher Panel
@@ -269,24 +317,30 @@ function Layout({ children }) {
 
           <div>
             <strong>{user?.name}</strong>
+
             <span>{user?.role}</span>
           </div>
         </div>
 
-        <button className="logout-btn" onClick={logout}>
+        <button
+          className="logout-btn"
+          onClick={logout}
+        >
           <LogOut size={21} />
           Logout
         </button>
       </aside>
 
-      <main className="main-content">{children}</main>
+      <main className="main-content">
+        {children}
+      </main>
     </div>
   );
 }
 
-/* =========================
+/* =========================================================
    DASHBOARD
-========================= */
+========================================================= */
 
 function Dashboard() {
   const user = getUser();
@@ -296,10 +350,15 @@ function Dashboard() {
       <header className="page-header">
         <div>
           <h1>Dashboard</h1>
-          <p>Welcome back, {user?.name}</p>
+
+          <p>
+            Welcome back, {user?.name}
+          </p>
         </div>
 
-        <span className="role-badge">{user?.role?.toUpperCase()}</span>
+        <span className="role-badge">
+          {user?.role?.toUpperCase()}
+        </span>
       </header>
 
       <div className="stats-grid">
@@ -307,6 +366,7 @@ function Dashboard() {
           <div className="stat-icon">
             <CheckCircle />
           </div>
+
           <div>
             <span>Attendance</span>
             <strong>Active</strong>
@@ -317,6 +377,7 @@ function Dashboard() {
           <div className="stat-icon">
             <ShieldCheck />
           </div>
+
           <div>
             <span>Blockchain</span>
             <strong>Connected</strong>
@@ -327,6 +388,7 @@ function Dashboard() {
           <div className="stat-icon">
             <Clock />
           </div>
+
           <div>
             <span>System</span>
             <strong>Online</strong>
@@ -337,27 +399,43 @@ function Dashboard() {
       {user?.role === "student" && (
         <div className="welcome-card">
           <QrCode size={45} />
+
           <div>
             <h2>Mark your attendance</h2>
+
             <p>
-              Scan your teacher's QR code and your attendance will be securely
-              recorded.
+              Scan your teacher's QR code and your
+              attendance will be securely recorded.
             </p>
-            <Link className="primary-link" to="/mark-attendance">
+
+            <Link
+              className="primary-link"
+              to="/mark-attendance"
+            >
               Mark Attendance
             </Link>
           </div>
         </div>
       )}
 
-      {(user?.role === "teacher" || user?.role === "admin") && (
+      {(user?.role === "teacher" ||
+        user?.role === "admin") && (
         <div className="welcome-card">
           <BookOpen size={45} />
+
           <div>
             <h2>Manage Attendance</h2>
-            <p>Create attendance sessions, generate QR codes and lock sessions
-              to mint blockchain attendance NFTs.</p>
-            <Link className="primary-link" to="/teacher">
+
+            <p>
+              Create attendance sessions, generate QR
+              codes and lock sessions to mint blockchain
+              attendance NFTs.
+            </p>
+
+            <Link
+              className="primary-link"
+              to="/teacher"
+            >
               Open Teacher Panel
             </Link>
           </div>
@@ -367,61 +445,229 @@ function Dashboard() {
   );
 }
 
-/* =========================
+/* =========================================================
    STUDENT ATTENDANCE
-========================= */
+   CAMERA + QR IMAGE UPLOAD
+========================================================= */
 
 function MarkAttendance() {
   const [token, setToken] = useState("");
+
   const [message, setMessage] = useState("");
+
   const [error, setError] = useState("");
-  const [scannerOpen, setScannerOpen] = useState(false);
+
+  const [scannerOpen, setScannerOpen] =
+    useState(false);
+
   const [loading, setLoading] = useState(false);
 
+  const [uploading, setUploading] =
+    useState(false);
+
+  const scannerRef = useRef(null);
+
+  const fileInputRef = useRef(null);
+
+  /* -------------------------------------------------------
+     CLEANUP CAMERA WHEN COMPONENT CLOSES
+  ------------------------------------------------------- */
+
   useEffect(() => {
-    if (!scannerOpen) return;
-
-    const scanner = new Html5QrcodeScanner(
-      "qr-reader",
-      {
-        fps: 10,
-        qrbox: { width: 250, height: 250 },
-      },
-      false
-    );
-
-    scanner.render(
-      (decodedText) => {
-        setToken(decodedText);
-        setScannerOpen(false);
-        scanner.clear().catch(() => {});
-      },
-      () => {}
-    );
-
     return () => {
-      scanner.clear().catch(() => {});
+      if (scannerRef.current) {
+        scannerRef.current
+          .stop()
+          .catch(() => {})
+          .finally(() => {
+            try {
+              scannerRef.current.clear();
+            } catch {}
+
+            scannerRef.current = null;
+          });
+      }
     };
-  }, [scannerOpen]);
+  }, []);
+
+  /* -------------------------------------------------------
+     START CAMERA
+  ------------------------------------------------------- */
+
+  const startCamera = async () => {
+    setError("");
+    setMessage("");
+
+    setScannerOpen(true);
+
+    setTimeout(async () => {
+      try {
+        const scanner = new Html5Qrcode(
+          "qr-reader"
+        );
+
+        scannerRef.current = scanner;
+
+        await scanner.start(
+          {
+            facingMode: "environment",
+          },
+          {
+            fps: 10,
+
+            qrbox: {
+              width: 250,
+              height: 250,
+            },
+
+            aspectRatio: 1,
+          },
+
+          async (decodedText) => {
+            setToken(decodedText);
+
+            setMessage(
+              "QR code detected successfully."
+            );
+
+            try {
+              await scanner.stop();
+            } catch {}
+
+            try {
+              scanner.clear();
+            } catch {}
+
+            scannerRef.current = null;
+
+            setScannerOpen(false);
+          },
+
+          () => {}
+        );
+      } catch (err) {
+        console.error(
+          "Camera scanner error:",
+          err
+        );
+
+        setScannerOpen(false);
+
+        setError(
+          "Camera could not be opened. Please allow camera permission or use Upload QR Picture."
+        );
+      }
+    }, 150);
+  };
+
+  /* -------------------------------------------------------
+     STOP CAMERA
+  ------------------------------------------------------- */
+
+  const stopCamera = async () => {
+    if (scannerRef.current) {
+      try {
+        await scannerRef.current.stop();
+      } catch {}
+
+      try {
+        scannerRef.current.clear();
+      } catch {}
+
+      scannerRef.current = null;
+    }
+
+    setScannerOpen(false);
+  };
+
+  /* -------------------------------------------------------
+     UPLOAD QR IMAGE
+  ------------------------------------------------------- */
+
+  const handleImageUpload = async (e) => {
+    const file = e.target.files?.[0];
+
+    if (!file) {
+      return;
+    }
+
+    setUploading(true);
+
+    setError("");
+    setMessage("");
+
+    try {
+      const scanner = new Html5Qrcode(
+        "qr-image-reader"
+      );
+
+      const decodedText =
+        await scanner.scanFile(file, true);
+
+      setToken(decodedText);
+
+      setMessage(
+        "QR code detected successfully from picture."
+      );
+
+      try {
+        scanner.clear();
+      } catch {}
+    } catch (err) {
+      console.error(
+        "QR image scanning error:",
+        err
+      );
+
+      setError(
+        "QR code could not be detected from this picture. Please upload a clear QR code image."
+      );
+    } finally {
+      setUploading(false);
+
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
+  };
+
+  /* -------------------------------------------------------
+     MARK ATTENDANCE
+  ------------------------------------------------------- */
 
   const mark = async (e) => {
     e.preventDefault();
 
-    if (!token.trim()) return;
+    if (!token.trim()) {
+      setError(
+        "Please scan a QR code or enter the QR token."
+      );
+
+      return;
+    }
 
     setLoading(true);
+
     setMessage("");
     setError("");
 
     try {
-      const data = await api("/attendance/mark", {
-        method: "POST",
-        body: JSON.stringify({
-          qr_token: token.trim(),
-        }),
-      });
+      const data = await api(
+        "/attendance/mark",
+        {
+          method: "POST",
 
-      setMessage(data.message || "Attendance marked successfully.");
+          body: JSON.stringify({
+            qr_token: token.trim(),
+          }),
+        }
+      );
+
+      setMessage(
+        data.message ||
+          "Attendance marked successfully."
+      );
+
       setToken("");
     } catch (err) {
       setError(err.message);
@@ -435,9 +681,15 @@ function MarkAttendance() {
       <header className="page-header">
         <div>
           <h1>Mark Attendance</h1>
-          <p>Scan the QR code provided by your teacher.</p>
+
+          <p>
+            Scan the QR code provided by your teacher.
+          </p>
         </div>
-        <span className="role-badge">STUDENT</span>
+
+        <span className="role-badge">
+          STUDENT
+        </span>
       </header>
 
       <div className="attendance-card">
@@ -446,59 +698,142 @@ function MarkAttendance() {
         </div>
 
         <h2>Mark Attendance</h2>
-        <p>Scan the session QR code or enter its token.</p>
+
+        <p>
+          Scan the session QR code using your camera
+          or upload a QR code picture.
+        </p>
+
+        {/* =================================================
+            CAMERA
+        ================================================= */}
 
         {scannerOpen && (
           <div className="scanner-wrapper">
-            <div id="qr-reader"></div>
+            <div
+              id="qr-reader"
+              className="qr-reader"
+            ></div>
+
+            <button
+              type="button"
+              className="secondary-btn"
+              onClick={stopCamera}
+            >
+              Close Camera
+            </button>
           </div>
         )}
 
+        {/* =================================================
+            CAMERA + IMAGE BUTTONS
+        ================================================= */}
+
         {!scannerOpen && (
-          <button
-            className="secondary-btn"
-            onClick={() => {
-              setError("");
-              setMessage("");
-              setScannerOpen(true);
-            }}
-          >
-            <QrCode size={20} />
-            Scan QR Code
-          </button>
+          <>
+            <button
+              type="button"
+              className="secondary-btn"
+              onClick={startCamera}
+            >
+              <QrCode size={20} />
+
+              Scan with Camera
+            </button>
+
+            <button
+              type="button"
+              className="secondary-btn"
+              onClick={() =>
+                fileInputRef.current?.click()
+              }
+              disabled={uploading}
+            >
+              <QrCode size={20} />
+
+              {uploading
+                ? "Detecting QR..."
+                : "Upload QR Picture"}
+            </button>
+
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleImageUpload}
+              style={{
+                display: "none",
+              }}
+            />
+
+            {/* Hidden scanner container for image scanning */}
+
+            <div
+              id="qr-image-reader"
+              style={{
+                width: "1px",
+                height: "1px",
+                overflow: "hidden",
+                position: "absolute",
+                left: "-9999px",
+                top: "-9999px",
+              }}
+            ></div>
+          </>
         )}
 
-        <div className="or">OR</div>
+        <div className="or">
+          OR
+        </div>
 
-        <form onSubmit={mark} className="attendance-form">
+        {/* =================================================
+            TOKEN INPUT
+        ================================================= */}
+
+        <form
+          onSubmit={mark}
+          className="attendance-form"
+        >
           <input
             value={token}
-            onChange={(e) => setToken(e.target.value)}
-            placeholder="Paste QR token here"
+            onChange={(e) =>
+              setToken(e.target.value)
+            }
+            placeholder="QR token will appear here"
             required
           />
 
-          <button className="primary-btn" disabled={loading}>
-            {loading ? "Marking..." : "Mark Attendance"}
+          <button
+            className="primary-btn"
+            disabled={loading}
+          >
+            {loading
+              ? "Marking..."
+              : "Mark Attendance"}
           </button>
         </form>
 
         {message && (
           <div className="success">
             <CheckCircle size={20} />
+
             {message}
           </div>
         )}
 
-        {error && <div className="error">{error}</div>}
+        {error && (
+          <div className="error">
+            {error}
+          </div>
+        )}
       </div>
     </Layout>
   );
 }
 
-/* =========================
+/* =========================================================
    TEACHER PANEL
-========================= */
+========================================================= */
 
 function TeacherPanel() {
   const [form, setForm] = useState({
@@ -508,11 +843,17 @@ function TeacherPanel() {
   });
 
   const [session, setSession] = useState(null);
+
   const [error, setError] = useState("");
+
   const [message, setMessage] = useState("");
+
   const [loading, setLoading] = useState(false);
+
   const [locking, setLocking] = useState(false);
-  const [blockchain, setBlockchain] = useState(null);
+
+  const [blockchain, setBlockchain] =
+    useState(null);
 
   const change = (e) => {
     setForm({
@@ -525,18 +866,26 @@ function TeacherPanel() {
     e.preventDefault();
 
     setLoading(true);
+
     setError("");
     setMessage("");
     setBlockchain(null);
 
     try {
-      const data = await api("/attendance/sessions", {
-        method: "POST",
-        body: JSON.stringify(form),
-      });
+      const data = await api(
+        "/attendance/sessions",
+        {
+          method: "POST",
+
+          body: JSON.stringify(form),
+        }
+      );
 
       setSession(data.session);
-      setMessage("Attendance session created successfully.");
+
+      setMessage(
+        "Attendance session created successfully."
+      );
     } catch (err) {
       setError(err.message);
     } finally {
@@ -545,29 +894,40 @@ function TeacherPanel() {
   };
 
   const lockSession = async () => {
-    if (!session) return;
+    if (!session) {
+      return;
+    }
 
     const confirmed = window.confirm(
       "Lock this attendance session and mint blockchain NFTs?"
     );
 
-    if (!confirmed) return;
+    if (!confirmed) {
+      return;
+    }
 
     setLocking(true);
+
     setError("");
     setMessage("");
 
     try {
-      const data = await api(`/attendance/sessions/${session.id}/lock`, {
-        method: "POST",
-      });
+      const data = await api(
+        `/attendance/sessions/${session.id}/lock`,
+        {
+          method: "POST",
+        }
+      );
 
       setSession({
         ...session,
         status: "locked",
       });
 
-      setBlockchain(data.blockchain || []);
+      setBlockchain(
+        data.blockchain || []
+      );
+
       setMessage(data.message);
     } catch (err) {
       setError(err.message);
@@ -581,21 +941,30 @@ function TeacherPanel() {
       <header className="page-header">
         <div>
           <h1>Teacher Panel</h1>
-          <p>Create and manage attendance sessions.</p>
+
+          <p>
+            Create and manage attendance sessions.
+          </p>
         </div>
 
-        <span className="role-badge">TEACHER</span>
+        <span className="role-badge">
+          TEACHER
+        </span>
       </header>
 
       <div className="teacher-grid">
         <div className="panel-card">
           <h2>
             <Plus size={23} />
+
             Create Attendance Session
           </h2>
 
           <form onSubmit={createSession}>
-            <label>Course Name</label>
+            <label>
+              Course Name
+            </label>
+
             <input
               name="course_name"
               placeholder="e.g. Artificial Intelligence"
@@ -604,7 +973,10 @@ function TeacherPanel() {
               required
             />
 
-            <label>Date</label>
+            <label>
+              Date
+            </label>
+
             <input
               type="date"
               name="session_date"
@@ -613,7 +985,10 @@ function TeacherPanel() {
               required
             />
 
-            <label>Start Time</label>
+            <label>
+              Start Time
+            </label>
+
             <input
               type="time"
               name="start_time"
@@ -622,8 +997,13 @@ function TeacherPanel() {
               required
             />
 
-            <button className="primary-btn" disabled={loading}>
-              {loading ? "Creating..." : "Create Session"}
+            <button
+              className="primary-btn"
+              disabled={loading}
+            >
+              {loading
+                ? "Creating..."
+                : "Create Session"}
             </button>
           </form>
         </div>
@@ -632,11 +1012,18 @@ function TeacherPanel() {
           <div className="panel-card session-card">
             <div className="session-header">
               <div>
-                <span className="small-label">ACTIVE SESSION</span>
-                <h2>{session.course_name}</h2>
+                <span className="small-label">
+                  ACTIVE SESSION
+                </span>
+
+                <h2>
+                  {session.course_name}
+                </h2>
               </div>
 
-              <span className="status-badge">{session.status}</span>
+              <span className="status-badge">
+                {session.status}
+              </span>
             </div>
 
             <div className="qr-box">
@@ -648,17 +1035,20 @@ function TeacherPanel() {
             </div>
 
             <p className="qr-help">
-              Students scan this QR code to mark attendance.
+              Students scan this QR code to
+              mark attendance.
             </p>
 
             <div className="session-info">
               <div>
                 <Clock size={18} />
+
                 {session.start_time}
               </div>
 
               <div>
                 <BookOpen size={18} />
+
                 Session #{session.id}
               </div>
             </div>
@@ -670,6 +1060,7 @@ function TeacherPanel() {
                 disabled={locking}
               >
                 <Lock size={20} />
+
                 {locking
                   ? "Minting NFTs..."
                   : "Lock Attendance & Mint NFTs"}
@@ -679,42 +1070,71 @@ function TeacherPanel() {
         )}
       </div>
 
-      {message && <div className="success page-message">{message}</div>}
-      {error && <div className="error page-message">{error}</div>}
-
-      {blockchain && blockchain.length > 0 && (
-        <div className="panel-card blockchain-card">
-          <h2>
-            <ShieldCheck size={23} />
-            Blockchain Records
-          </h2>
-
-          {blockchain.map((item) => (
-            <div className="blockchain-row" key={item.attendance_id}>
-              <div>
-                <strong>Student #{item.student_id}</strong>
-                <span>Token ID: {item.token_id}</span>
-              </div>
-
-              <div>
-                <span>Transaction</span>
-                <code>{item.transaction_hash}</code>
-              </div>
-            </div>
-          ))}
+      {message && (
+        <div className="success page-message">
+          {message}
         </div>
       )}
+
+      {error && (
+        <div className="error page-message">
+          {error}
+        </div>
+      )}
+
+      {blockchain &&
+        blockchain.length > 0 && (
+          <div className="panel-card blockchain-card">
+            <h2>
+              <ShieldCheck size={23} />
+
+              Blockchain Records
+            </h2>
+
+            {blockchain.map((item) => (
+              <div
+                className="blockchain-row"
+                key={item.attendance_id}
+              >
+                <div>
+                  <strong>
+                    Student #{item.student_id}
+                  </strong>
+
+                  <span>
+                    Token ID: {item.token_id}
+                  </span>
+                </div>
+
+                <div>
+                  <span>
+                    Transaction
+                  </span>
+
+                  <code>
+                    {item.transaction_hash}
+                  </code>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
     </Layout>
   );
 }
 
-/* =========================
+/* =========================================================
    ROUTE PROTECTION
-========================= */
+========================================================= */
 
 function ProtectedRoute({ children }) {
   if (!getToken()) {
-    return <Navigate to="/login" replace />;
+    return (
+      <Navigate
+        to="/login"
+        replace
+      />
+    );
   }
 
   return children;
@@ -722,15 +1142,20 @@ function ProtectedRoute({ children }) {
 
 function PublicRoute({ children }) {
   if (getToken()) {
-    return <Navigate to="/dashboard" replace />;
+    return (
+      <Navigate
+        to="/dashboard"
+        replace
+      />
+    );
   }
 
   return children;
 }
 
-/* =========================
+/* =========================================================
    APP
-========================= */
+========================================================= */
 
 function App() {
   return (
@@ -849,7 +1274,14 @@ function App() {
           display: flex;
           gap: 9px;
           align-items: center;
+          justify-content: center;
           margin: 20px auto;
+          min-width: 230px;
+        }
+
+        .secondary-btn:disabled {
+          opacity: .6;
+          cursor: not-allowed;
         }
 
         .bottom-text {
@@ -1118,15 +1550,24 @@ function App() {
         .or {
           color: #9aa5b8;
           margin: 15px;
+          font-weight: 700;
         }
 
         .scanner-wrapper {
-          max-width: 400px;
+          max-width: 420px;
           margin: 25px auto;
         }
 
         #qr-reader {
+          width: 100%;
           border: 0 !important;
+          overflow: hidden;
+          border-radius: 15px;
+        }
+
+        #qr-reader video {
+          width: 100% !important;
+          border-radius: 15px;
         }
 
         .teacher-grid {
@@ -1286,6 +1727,10 @@ function App() {
           .attendance-card {
             padding: 30px 20px;
           }
+
+          .secondary-btn {
+            width: 100%;
+          }
         }
       `}</style>
 
@@ -1338,12 +1783,22 @@ function App() {
 
           <Route
             path="/"
-            element={<Navigate to="/dashboard" replace />}
+            element={
+              <Navigate
+                to="/dashboard"
+                replace
+              />
+            }
           />
 
           <Route
             path="*"
-            element={<Navigate to="/dashboard" replace />}
+            element={
+              <Navigate
+                to="/dashboard"
+                replace
+              />
+            }
           />
         </Routes>
       </BrowserRouter>
