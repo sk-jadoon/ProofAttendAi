@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { BrowserProvider } from "ethers";
+import {
+  BrowserProvider,
+  Contract,
+} from "ethers";
 import {
   BrowserRouter,
   Routes,
@@ -24,7 +27,12 @@ import {
 } from "lucide-react";
 
 const API = "https://proof-attend-ai-sx1w.vercel.app/api";
+const ATTENDANCE_NFT_CONTRACT_ADDRESS =
+  "0xf8e81D47203A594245E36C48e151709F0C19fBe8";
 
+const ATTENDANCE_NFT_ABI = [
+  "function lockAttendanceSession(uint256 sessionId, bytes32 attendanceHash)",
+];
 const getToken = () => localStorage.getItem("token");
 
 const getUser = () =>
@@ -37,18 +45,55 @@ async function connectWallet() {
   }
 
   try {
-    const provider = new BrowserProvider(window.ethereum);
+    const provider =
+      new BrowserProvider(
+        window.ethereum
+      );
 
-    await provider.send("eth_requestAccounts", []);
+    await provider.send(
+      "eth_requestAccounts",
+      []
+    );
 
-    const signer = await provider.getSigner();
-    const address = await signer.getAddress();
+    const signer =
+      await provider.getSigner();
 
-    localStorage.setItem("walletAddress", address);
+    const address =
+      await signer.getAddress();
+
+    /*
+    |--------------------------------------------------------------------------
+    | Save wallet in backend database
+    |--------------------------------------------------------------------------
+    */
+    await api(
+      "/attendance/wallet/connect",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          wallet_address:
+            address,
+        }),
+      }
+    );
+
+    localStorage.setItem(
+      "walletAddress",
+      address
+    );
 
     return address;
   } catch (error) {
-    console.error("Wallet connection error:", error);
+    console.error(
+      "Wallet connection error:",
+      error
+    );
+
+    alert(
+      error.message ||
+        "Could not connect wallet."
+    );
+
     return null;
   }
 }
@@ -935,6 +980,31 @@ function TeacherPanel() {
   const [blockchain, setBlockchain] =
     useState(null);
 
+    const loadSession = async (sessionId) => {
+  try {
+    const data = await api(
+      `/attendance/sessions/${sessionId}`
+    );
+
+    setSession(data.session);
+
+    setBlockchain(
+      data.records || []
+    );
+
+    return data;
+  } catch (err) {
+    console.error(
+      "Load session error:",
+      err
+    );
+
+    setError(err.message);
+
+    return null;
+  }
+};
+
   const change = (e) => {
     setForm({
       ...form,
@@ -961,11 +1031,11 @@ function TeacherPanel() {
         }
       );
 
-      setSession(data.session);
+      await loadSession(data.session.id);
 
-      setMessage(
-        "Attendance session created successfully."
-      );
+    setMessage(
+    "Attendance session created successfully."
+    );
     } catch (err) {
       setError(err.message);
     } finally {
@@ -973,48 +1043,193 @@ function TeacherPanel() {
     }
   };
 
-  const lockSession = async () => {
-    if (!session) {
-      return;
-    }
+ const lockSession = async () => {
+  if (!session) {
+    return;
+  }
 
-    const confirmed = window.confirm(
+  if (!window.ethereum) {
+    setError(
+      "Please install MetaMask first."
+    );
+    return;
+  }
+
+  const confirmed =
+    window.confirm(
       "Lock this attendance session and mint blockchain NFTs?"
     );
 
-    if (!confirmed) {
-      return;
-    }
+  if (!confirmed) {
+    return;
+  }
 
-    setLocking(true);
+  setLocking(true);
 
-    setError("");
-    setMessage("");
+  setError("");
+  setMessage("");
+  setBlockchain(null);
 
-    try {
-      const data = await api(
+  try {
+    /*
+    |--------------------------------------------------------------------------
+    | STEP 1 — Ask backend for exact attendance hash
+    |--------------------------------------------------------------------------
+    */
+    const prepared =
+      await api(
         `/attendance/sessions/${session.id}/lock`,
         {
           method: "POST",
+
+          body: JSON.stringify({
+            prepare_only: true,
+          }),
         }
       );
 
-      setSession({
-        ...session,
-        status: "locked",
-      });
+    const attendanceHash =
+      prepared.attendance_hash;
 
-      setBlockchain(
-        data.blockchain || []
+    /*
+    |--------------------------------------------------------------------------
+    | STEP 2 — Connect MetaMask
+    |--------------------------------------------------------------------------
+    */
+    const provider =
+      new BrowserProvider(
+        window.ethereum
       );
 
-      setMessage(data.message);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLocking(false);
+    await provider.send(
+      "eth_requestAccounts",
+      []
+    );
+
+    const signer =
+      await provider.getSigner();
+
+    const teacherWallet =
+      await signer.getAddress();
+
+    /*
+    |--------------------------------------------------------------------------
+    | STEP 3 — Contract connected to TEACHER'S MetaMask
+    |--------------------------------------------------------------------------
+    */
+    const contract =
+      new Contract(
+        ATTENDANCE_NFT_CONTRACT_ADDRESS,
+        ATTENDANCE_NFT_ABI,
+        signer
+      );
+
+    setMessage(
+      "Please confirm the transaction in MetaMask..."
+    );
+
+    /*
+    |--------------------------------------------------------------------------
+    | STEP 4 — MetaMask POPUP
+    |--------------------------------------------------------------------------
+    */
+    const tx =
+      await contract.lockAttendanceSession(
+        session.id,
+        attendanceHash
+      );
+
+    setMessage(
+      "Transaction submitted. Waiting for blockchain confirmation..."
+    );
+
+    /*
+    |--------------------------------------------------------------------------
+    | STEP 5 — Wait for blockchain confirmation
+    |--------------------------------------------------------------------------
+    */
+    const receipt =
+      await tx.wait();
+
+    if (!receipt) {
+      throw new Error(
+        "Blockchain transaction was not confirmed."
+      );
     }
-  };
+
+    /*
+    |--------------------------------------------------------------------------
+    | STEP 6 — Tell backend transaction is confirmed
+    |--------------------------------------------------------------------------
+    */
+    const data =
+      await api(
+        `/attendance/sessions/${session.id}/lock`,
+        {
+          method: "POST",
+
+          body: JSON.stringify({
+            transaction_hash:
+              tx.hash,
+
+            teacher_wallet:
+              teacherWallet,
+
+            attendance_hash:
+              attendanceHash,
+          }),
+        }
+      );
+
+    /*
+    |--------------------------------------------------------------------------
+    | STEP 7 — Session locked
+    |--------------------------------------------------------------------------
+    */
+    setSession({
+      ...session,
+      status: "locked",
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | STEP 8 — Show NFT records
+    |--------------------------------------------------------------------------
+    */
+    setBlockchain(
+      data.blockchain || []
+    );
+
+    setMessage(
+      data.message ||
+        "Attendance locked successfully."
+    );
+  } catch (err) {
+    console.error(
+      "Lock attendance error:",
+      err
+    );
+
+    if (
+      err.code === 4001 ||
+      err.code ===
+        "ACTION_REJECTED"
+    ) {
+      setError(
+        "Transaction was rejected in MetaMask."
+      );
+    } else {
+      setError(
+        err.reason ||
+          err.shortMessage ||
+          err.message ||
+          "Failed to lock attendance."
+      );
+    }
+  } finally {
+    setLocking(false);
+  }
+};
 
   return (
     <Layout>
@@ -1142,8 +1357,8 @@ function TeacherPanel() {
                 <Lock size={20} />
 
                 {locking
-                  ? "Minting NFTs..."
-                  : "Lock Attendance & Mint NFTs"}
+                ? "Confirming Blockchain..."
+                : "Lock Attendance"}
               </button>
             )}
           </div>
