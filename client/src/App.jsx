@@ -649,7 +649,9 @@ function MarkAttendance() {
           },
 
           async (decodedText) => {
-            setToken(decodedText);
+          console.log("SCANNED QR TOKEN:", decodedText);
+
+          setToken(decodedText.trim());
 
             setMessage(
               "QR code detected successfully."
