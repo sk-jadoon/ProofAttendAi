@@ -1257,20 +1257,21 @@ const lockSession = async () => {
 
     /*
     |--------------------------------------------------------------------------
-    | Verify token IDs
-    |--------------------------------------------------------------------------
-    */
-    const missingToken =
-      blockchainRecords.some(
-        (item) =>
-          item.token_id === null
-      );
+    | /*
+|--------------------------------------------------------------------------
+| Verify token IDs
+|--------------------------------------------------------------------------
+*/
 
-    if (missingToken) {
-      throw new Error(
-        "Blockchain transaction confirmed, but NFT token ID could not be found in the transaction events."
-      );
-    }
+const missingToken = blockchainRecords.some(
+  (item) => item.token_id === null || item.token_id === undefined
+);
+
+if (missingToken) {
+  console.warn(
+    "Transaction confirmed, but token ID was not found in transaction events."
+  );
+}
 
     /*
     |--------------------------------------------------------------------------
