@@ -3,7 +3,6 @@ const express = require("express");
 const {
   createSession,
   markAttendance,
-  lockSession,
   getSession,
   connectWallet,
   prepareLockSession,
@@ -19,7 +18,7 @@ const router = express.Router();
 
 /*
 |--------------------------------------------------------------------------
-| Teacher/Admin creates attendance session
+| CREATE ATTENDANCE SESSION
 |--------------------------------------------------------------------------
 */
 router.post(
@@ -31,7 +30,7 @@ router.post(
 
 /*
 |--------------------------------------------------------------------------
-| Student connects MetaMask wallet
+| CONNECT STUDENT WALLET
 |--------------------------------------------------------------------------
 */
 router.post(
@@ -43,7 +42,7 @@ router.post(
 
 /*
 |--------------------------------------------------------------------------
-| Student marks attendance
+| MARK ATTENDANCE
 |--------------------------------------------------------------------------
 */
 router.post(
@@ -55,9 +54,10 @@ router.post(
 
 /*
 |--------------------------------------------------------------------------
-| Prepare attendance lock
+| PREPARE LOCK
 |--------------------------------------------------------------------------
-| Does NOT send blockchain transaction.
+| Backend calculates the attendance hash.
+| No blockchain transaction is sent here.
 |--------------------------------------------------------------------------
 */
 router.post(
@@ -69,9 +69,9 @@ router.post(
 
 /*
 |--------------------------------------------------------------------------
-| Confirm attendance lock
+| CONFIRM LOCK
 |--------------------------------------------------------------------------
-| Called AFTER MetaMask transactions are confirmed.
+| Frontend sends confirmed blockchain transaction records here.
 |--------------------------------------------------------------------------
 */
 router.post(
@@ -83,7 +83,7 @@ router.post(
 
 /*
 |--------------------------------------------------------------------------
-| Get complete session + attendance records
+| GET SESSION
 |--------------------------------------------------------------------------
 */
 router.get(

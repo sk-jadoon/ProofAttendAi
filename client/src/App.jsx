@@ -1045,7 +1045,7 @@ function TeacherPanel() {
     }
   };
 
- const lockSession = async () => {
+const lockSession = async () => {
   if (!session) {
     return;
   }
@@ -1057,17 +1057,15 @@ function TeacherPanel() {
     return;
   }
 
-  const confirmed =
-    window.confirm(
-      "Lock this attendance session and mint blockchain NFTs?"
-    );
+  const confirmed = window.confirm(
+    "Lock this attendance session and mint blockchain NFTs?"
+  );
 
   if (!confirmed) {
     return;
   }
 
   setLocking(true);
-
   setError("");
   setMessage("");
   setBlockchain(null);
@@ -1075,27 +1073,30 @@ function TeacherPanel() {
   try {
     /*
     |--------------------------------------------------------------------------
-    | STEP 1 — Ask backend for exact attendance hash
+    | STEP 1 — PREPARE LOCK
+    |--------------------------------------------------------------------------
+    | Backend calculates the exact attendance hash.
     |--------------------------------------------------------------------------
     */
-    const prepared =
-      await api(
-        `/attendance/sessions/${session.id}/lock`,
-        {
-          method: "POST",
-
-          body: JSON.stringify({
-            prepare_only: true,
-          }),
-        }
-      );
+    const prepared = await api(
+      `/attendance/sessions/${session.id}/lock/prepare`,
+      {
+        method: "POST",
+      }
+    );
 
     const attendanceHash =
       prepared.attendance_hash;
 
+    if (!attendanceHash) {
+      throw new Error(
+        "Backend did not return attendance hash."
+      );
+    }
+
     /*
     |--------------------------------------------------------------------------
-    | STEP 2 — Connect MetaMask
+    | STEP 2 — CONNECT TEACHER METAMASK
     |--------------------------------------------------------------------------
     */
     const provider =
@@ -1114,9 +1115,14 @@ function TeacherPanel() {
     const teacherWallet =
       await signer.getAddress();
 
+    console.log(
+      "Teacher wallet:",
+      teacherWallet
+    );
+
     /*
     |--------------------------------------------------------------------------
-    | STEP 3 — Contract connected to TEACHER'S MetaMask
+    | STEP 3 — CONNECT SMART CONTRACT
     |--------------------------------------------------------------------------
     */
     const contract =
@@ -1126,20 +1132,25 @@ function TeacherPanel() {
         signer
       );
 
+    /*
+    |--------------------------------------------------------------------------
+    | STEP 4 — METAMASK TRANSACTION
+    |--------------------------------------------------------------------------
+    */
     setMessage(
       "Please confirm the transaction in MetaMask..."
     );
 
-    /*
-    |--------------------------------------------------------------------------
-    | STEP 4 — MetaMask POPUP
-    |--------------------------------------------------------------------------
-    */
     const tx =
       await contract.lockAttendanceSession(
         session.id,
         attendanceHash
       );
+
+    console.log(
+      "Blockchain transaction:",
+      tx
+    );
 
     setMessage(
       "Transaction submitted. Waiting for blockchain confirmation..."
@@ -1147,7 +1158,7 @@ function TeacherPanel() {
 
     /*
     |--------------------------------------------------------------------------
-    | STEP 5 — Wait for blockchain confirmation
+    | STEP 5 — WAIT FOR CONFIRMATION
     |--------------------------------------------------------------------------
     */
     const receipt =
@@ -1159,33 +1170,131 @@ function TeacherPanel() {
       );
     }
 
+    console.log(
+      "Transaction receipt:",
+      receipt
+    );
+
     /*
     |--------------------------------------------------------------------------
-    | STEP 6 — Tell backend transaction is confirmed
+    | STEP 6 — GET TOKEN IDs FROM EVENTS
+    |--------------------------------------------------------------------------
+    |
+    | tx.attendance_id / tx.token_id DO NOT exist on a normal
+    | ethers transaction response.
+    |
+    | We therefore read the contract logs.
     |--------------------------------------------------------------------------
     */
-    const data =
-      await api(
-        `/attendance/sessions/${session.id}/lock`,
-        {
-          method: "POST",
 
-          body: JSON.stringify({
-            transaction_hash:
-              tx.hash,
+    const blockchainRecords =
+      [];
 
-            teacher_wallet:
-              teacherWallet,
+    for (const student of prepared.students) {
+      blockchainRecords.push({
+        attendance_id:
+          student.attendance_id,
 
-            attendance_hash:
-              attendanceHash,
-          }),
-        }
-      );
+        transaction_hash:
+          tx.hash,
+
+        /*
+        | Token ID will be extracted below.
+        */
+        token_id: null,
+      });
+    }
 
     /*
     |--------------------------------------------------------------------------
-    | STEP 7 — Session locked
+    | Find AttendanceNFTMinted events
+    |--------------------------------------------------------------------------
+    */
+    for (const log of receipt.logs) {
+      try {
+        const parsed =
+          contract.interface.parseLog(log);
+
+        if (
+          parsed &&
+          parsed.name ===
+            "AttendanceNFTMinted"
+        ) {
+          const tokenId =
+            parsed.args.tokenId;
+
+          const studentAddress =
+            parsed.args.student;
+
+          const matchingRecord =
+            prepared.students.find(
+              (student) =>
+                student.wallet_address.toLowerCase() ===
+                studentAddress.toLowerCase()
+            );
+
+          if (matchingRecord) {
+            const blockchainRecord =
+              blockchainRecords.find(
+                (item) =>
+                  item.attendance_id ===
+                  matchingRecord.attendance_id
+              );
+
+            if (blockchainRecord) {
+              blockchainRecord.token_id =
+                tokenId.toString();
+            }
+          }
+        }
+      } catch (parseError) {
+        console.log(
+          "Could not parse log:",
+          parseError
+        );
+      }
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Verify token IDs
+    |--------------------------------------------------------------------------
+    */
+    const missingToken =
+      blockchainRecords.some(
+        (item) =>
+          item.token_id === null
+      );
+
+    if (missingToken) {
+      throw new Error(
+        "Blockchain transaction confirmed, but NFT token ID could not be found in the transaction events."
+      );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | STEP 7 — CONFIRM WITH BACKEND
+    |--------------------------------------------------------------------------
+    */
+    const data = await api(
+      `/attendance/sessions/${session.id}/lock/confirm`,
+      {
+        method: "POST",
+
+        body: JSON.stringify({
+          attendance_hash:
+            attendanceHash,
+
+          blockchain:
+            blockchainRecords,
+        }),
+      }
+    );
+
+    /*
+    |--------------------------------------------------------------------------
+    | STEP 8 — UPDATE UI
     |--------------------------------------------------------------------------
     */
     setSession({
@@ -1193,11 +1302,6 @@ function TeacherPanel() {
       status: "locked",
     });
 
-    /*
-    |--------------------------------------------------------------------------
-    | STEP 8 — Show NFT records
-    |--------------------------------------------------------------------------
-    */
     setBlockchain(
       data.blockchain || []
     );
