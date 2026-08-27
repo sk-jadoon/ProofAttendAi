@@ -32,6 +32,7 @@ const ATTENDANCE_NFT_CONTRACT_ADDRESS =
 
 const ATTENDANCE_NFT_ABI = [
   "function lockAttendanceSession(uint256 sessionId, bytes32 attendanceHash)",
+  "event AttendanceNFTMinted(uint256 indexed tokenId, uint256 indexed sessionId, address indexed student, bytes32 attendanceHash)",
 ];
 const getToken = () => localStorage.getItem("token");
 
