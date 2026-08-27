@@ -27,6 +27,26 @@ contract AttendanceNFT is ERC721, Ownable {
         bytes32 attendanceHash
     );
 
+event AttendanceSessionLocked(
+    uint256 indexed sessionId,
+    address indexed teacher,
+    bytes32 attendanceHash
+);
+
+function lockAttendanceSession(
+    uint256 sessionId,
+    bytes32 attendanceHash
+) external {
+    require(sessionId > 0, "Invalid session ID");
+    require(attendanceHash != bytes32(0), "Invalid attendance hash");
+
+    emit AttendanceSessionLocked(
+        sessionId,
+        msg.sender,
+        attendanceHash
+    );
+}
+
     constructor()
         ERC721("ProofAttend Attendance", "PAT")
         Ownable(msg.sender)

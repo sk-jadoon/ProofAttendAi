@@ -6,9 +6,9 @@ import type { TypedContractEvent, TypedDeferredTopicFilter, TypedEventLog, Typed
   
 
   export interface AttendanceNFTInterface extends Interface {
-    getFunction(nameOrSignature: "approve" | "balanceOf" | "getApproved" | "getAttendanceByHash" | "getAttendanceRecord" | "getTokenIdByHash" | "isApprovedForAll" | "mintAttendanceNFT" | "name" | "owner" | "ownerOf" | "renounceOwnership" | "safeTransferFrom(address,address,uint256)" | "safeTransferFrom(address,address,uint256,bytes)" | "setApprovalForAll" | "supportsInterface" | "symbol" | "tokenURI" | "transferFrom" | "transferOwnership"): FunctionFragment;
+    getFunction(nameOrSignature: "approve" | "balanceOf" | "getApproved" | "getAttendanceByHash" | "getAttendanceRecord" | "getTokenIdByHash" | "isApprovedForAll" | "isAttendanceLocked" | "lockAttendance" | "mintAttendanceNFT" | "name" | "owner" | "ownerOf" | "renounceOwnership" | "safeTransferFrom(address,address,uint256)" | "safeTransferFrom(address,address,uint256,bytes)" | "setApprovalForAll" | "supportsInterface" | "symbol" | "tokenURI" | "transferFrom" | "transferOwnership"): FunctionFragment;
 
-    getEvent(nameOrSignatureOrTopic: "Approval" | "ApprovalForAll" | "AttendanceNFTMinted" | "OwnershipTransferred" | "Transfer"): EventFragment;
+    getEvent(nameOrSignatureOrTopic: "Approval" | "ApprovalForAll" | "AttendanceLocked" | "AttendanceNFTMinted" | "OwnershipTransferred" | "Transfer"): EventFragment;
 
     encodeFunctionData(functionFragment: 'approve', values: [AddressLike, BigNumberish]): string;
 encodeFunctionData(functionFragment: 'balanceOf', values: [AddressLike]): string;
@@ -17,6 +17,8 @@ encodeFunctionData(functionFragment: 'getAttendanceByHash', values: [BytesLike])
 encodeFunctionData(functionFragment: 'getAttendanceRecord', values: [BigNumberish]): string;
 encodeFunctionData(functionFragment: 'getTokenIdByHash', values: [BytesLike]): string;
 encodeFunctionData(functionFragment: 'isApprovedForAll', values: [AddressLike, AddressLike]): string;
+encodeFunctionData(functionFragment: 'isAttendanceLocked', values: [BigNumberish]): string;
+encodeFunctionData(functionFragment: 'lockAttendance', values: [BigNumberish]): string;
 encodeFunctionData(functionFragment: 'mintAttendanceNFT', values: [AddressLike, BigNumberish, BytesLike, string]): string;
 encodeFunctionData(functionFragment: 'name', values?: undefined): string;
 encodeFunctionData(functionFragment: 'owner', values?: undefined): string;
@@ -38,6 +40,8 @@ decodeFunctionResult(functionFragment: 'getAttendanceByHash', data: BytesLike): 
 decodeFunctionResult(functionFragment: 'getAttendanceRecord', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'getTokenIdByHash', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'isApprovedForAll', data: BytesLike): Result;
+decodeFunctionResult(functionFragment: 'isAttendanceLocked', data: BytesLike): Result;
+decodeFunctionResult(functionFragment: 'lockAttendance', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'mintAttendanceNFT', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'name', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'owner', data: BytesLike): Result;
@@ -70,6 +74,18 @@ decodeFunctionResult(functionFragment: 'transferOwnership', data: BytesLike): Re
       export type InputTuple = [owner: AddressLike, operator: AddressLike, approved: boolean];
       export type OutputTuple = [owner: string, operator: string, approved: boolean];
       export interface OutputObject {owner: string, operator: string, approved: boolean };
+      export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>
+      export type Filter = TypedDeferredTopicFilter<Event>
+      export type Log = TypedEventLog<Event>
+      export type LogDescription = TypedLogDescription<Event>
+    }
+
+  
+
+    export namespace AttendanceLockedEvent {
+      export type InputTuple = [sessionId: BigNumberish, lockedBy: AddressLike, timestamp: BigNumberish];
+      export type OutputTuple = [sessionId: bigint, lockedBy: string, timestamp: bigint];
+      export interface OutputObject {sessionId: bigint, lockedBy: string, timestamp: bigint };
       export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>
       export type Filter = TypedDeferredTopicFilter<Event>
       export type Log = TypedEventLog<Event>
@@ -200,6 +216,22 @@ decodeFunctionResult(functionFragment: 'transferOwnership', data: BytesLike): Re
       [owner: AddressLike, operator: AddressLike, ],
       [boolean],
       'view'
+    >
+    
+
+    
+    isAttendanceLocked: TypedContractMethod<
+      [sessionId: BigNumberish, ],
+      [boolean],
+      'view'
+    >
+    
+
+    
+    lockAttendance: TypedContractMethod<
+      [sessionId: BigNumberish, ],
+      [void],
+      'nonpayable'
     >
     
 
@@ -345,6 +377,16 @@ getFunction(nameOrSignature: 'isApprovedForAll'): TypedContractMethod<
       [boolean],
       'view'
     >;
+getFunction(nameOrSignature: 'isAttendanceLocked'): TypedContractMethod<
+      [sessionId: BigNumberish, ],
+      [boolean],
+      'view'
+    >;
+getFunction(nameOrSignature: 'lockAttendance'): TypedContractMethod<
+      [sessionId: BigNumberish, ],
+      [void],
+      'nonpayable'
+    >;
 getFunction(nameOrSignature: 'mintAttendanceNFT'): TypedContractMethod<
       [student: AddressLike, sessionId: BigNumberish, attendanceHash: BytesLike, metadataURI: string, ],
       [bigint],
@@ -413,6 +455,7 @@ getFunction(nameOrSignature: 'transferOwnership'): TypedContractMethod<
 
     getEvent(key: 'Approval'): TypedContractEvent<ApprovalEvent.InputTuple, ApprovalEvent.OutputTuple, ApprovalEvent.OutputObject>;
 getEvent(key: 'ApprovalForAll'): TypedContractEvent<ApprovalForAllEvent.InputTuple, ApprovalForAllEvent.OutputTuple, ApprovalForAllEvent.OutputObject>;
+getEvent(key: 'AttendanceLocked'): TypedContractEvent<AttendanceLockedEvent.InputTuple, AttendanceLockedEvent.OutputTuple, AttendanceLockedEvent.OutputObject>;
 getEvent(key: 'AttendanceNFTMinted'): TypedContractEvent<AttendanceNFTMintedEvent.InputTuple, AttendanceNFTMintedEvent.OutputTuple, AttendanceNFTMintedEvent.OutputObject>;
 getEvent(key: 'OwnershipTransferred'): TypedContractEvent<OwnershipTransferredEvent.InputTuple, OwnershipTransferredEvent.OutputTuple, OwnershipTransferredEvent.OutputObject>;
 getEvent(key: 'Transfer'): TypedContractEvent<TransferEvent.InputTuple, TransferEvent.OutputTuple, TransferEvent.OutputObject>;
@@ -425,6 +468,10 @@ getEvent(key: 'Transfer'): TypedContractEvent<TransferEvent.InputTuple, Transfer
 
       'ApprovalForAll(address,address,bool)': TypedContractEvent<ApprovalForAllEvent.InputTuple, ApprovalForAllEvent.OutputTuple, ApprovalForAllEvent.OutputObject>;
       ApprovalForAll: TypedContractEvent<ApprovalForAllEvent.InputTuple, ApprovalForAllEvent.OutputTuple, ApprovalForAllEvent.OutputObject>;
+    
+
+      'AttendanceLocked(uint256,address,uint256)': TypedContractEvent<AttendanceLockedEvent.InputTuple, AttendanceLockedEvent.OutputTuple, AttendanceLockedEvent.OutputObject>;
+      AttendanceLocked: TypedContractEvent<AttendanceLockedEvent.InputTuple, AttendanceLockedEvent.OutputTuple, AttendanceLockedEvent.OutputObject>;
     
 
       'AttendanceNFTMinted(uint256,uint256,address,bytes32)': TypedContractEvent<AttendanceNFTMintedEvent.InputTuple, AttendanceNFTMintedEvent.OutputTuple, AttendanceNFTMintedEvent.OutputObject>;

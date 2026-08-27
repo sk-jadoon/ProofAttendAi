@@ -6,6 +6,8 @@ const {
   lockSession,
   getSession,
   connectWallet,
+  prepareLockSession,
+  confirmLockSession,
 } = require("../controllers/attendanceController");
 
 const {
@@ -53,14 +55,30 @@ router.post(
 
 /*
 |--------------------------------------------------------------------------
-| Teacher/Admin locks attendance + mints NFTs
+| Prepare attendance lock
+|--------------------------------------------------------------------------
+| Does NOT send blockchain transaction.
 |--------------------------------------------------------------------------
 */
 router.post(
-  "/sessions/:id/lock",
+  "/sessions/:id/lock/prepare",
   protect,
   authorize("teacher", "admin"),
-  lockSession
+  prepareLockSession
+);
+
+/*
+|--------------------------------------------------------------------------
+| Confirm attendance lock
+|--------------------------------------------------------------------------
+| Called AFTER MetaMask transactions are confirmed.
+|--------------------------------------------------------------------------
+*/
+router.post(
+  "/sessions/:id/lock/confirm",
+  protect,
+  authorize("teacher", "admin"),
+  confirmLockSession
 );
 
 /*
