@@ -5,24 +5,69 @@ const {
   mintAttendanceNFT,
 } = require("../services/blockchainService");
 
-/*
-|--------------------------------------------------------------------------
-| CREATE ATTENDANCE SESSION
-|--------------------------------------------------------------------------
-*/
+/* ============================================================
+   HELPERS
+============================================================ */
+
+function isValidWalletAddress(wallet) {
+  return /^0x[a-fA-F0-9]{40}$/.test(
+    String(wallet || "").trim()
+  );
+}
+
+function isValidHash(hash) {
+  return /^0x[a-fA-F0-9]{64}$/.test(
+    String(hash || "").trim()
+  );
+}
+
+function getUserId(req) {
+  if (!req.user || !req.user.id) {
+    return null;
+  }
+
+  return Number(req.user.id);
+}
+
+function getUserRole(req) {
+  return String(req.user?.role || "").toLowerCase();
+}
+
+/* ============================================================
+   CREATE ATTENDANCE SESSION
+============================================================ */
+
 const createSession = async (req, res) => {
   try {
+    const userId = getUserId(req);
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized",
+      });
+    }
+
     const {
       course_name,
       session_date,
       start_time,
-    } = req.body;
+    } = req.body || {};
 
     if (!course_name || !session_date || !start_time) {
       return res.status(400).json({
         success: false,
         message:
           "Course name, date and start time are required",
+      });
+    }
+
+    const courseName = String(course_name).trim();
+
+    if (!courseName) {
+      return res.status(400).json({
+        success: false,
+        message: "Course name cannot be empty",
       });
     }
 
@@ -42,8 +87,8 @@ const createSession = async (req, res) => {
       )
       VALUES (?, ?, ?, ?, ?, 'open')`,
       [
-        req.user.id,
-        course_name.trim(),
+        userId,
+        courseName,
         session_date,
         start_time,
         qrToken,
@@ -55,36 +100,48 @@ const createSession = async (req, res) => {
       message: "Attendance session created",
 
       session: {
-        id: result.insertId,
-        course_name: course_name.trim(),
+        id: Number(result.insertId),
+        teacher_id: userId,
+        course_name: courseName,
         session_date,
         start_time,
+        end_time: null,
         qr_token: qrToken,
         status: "open",
+        total_attendance: 0,
       },
     });
   } catch (error) {
     console.error(
-      "Create session error:",
+      "CREATE SESSION ERROR:",
       error
     );
 
     return res.status(500).json({
       success: false,
       message:
+        error.message ||
         "Could not create attendance session",
     });
   }
 };
 
-/*
-|--------------------------------------------------------------------------
-| CONNECT STUDENT WALLET
-|--------------------------------------------------------------------------
-*/
+/* ============================================================
+   CONNECT STUDENT WALLET
+============================================================ */
+
 const connectWallet = async (req, res) => {
   try {
-    const { wallet_address } = req.body;
+    const userId = getUserId(req);
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized",
+      });
+    }
+
+    const { wallet_address } = req.body || {};
 
     if (!wallet_address) {
       return res.status(400).json({
@@ -93,34 +150,24 @@ const connectWallet = async (req, res) => {
       });
     }
 
-    const wallet = wallet_address.trim();
+    const wallet = String(wallet_address).trim();
 
-    /*
-    |--------------------------------------------------------------------------
-    | Validate Ethereum wallet address
-    |--------------------------------------------------------------------------
-    */
-    if (!/^0x[a-fA-F0-9]{40}$/.test(wallet)) {
+    if (!isValidWalletAddress(wallet)) {
       return res.status(400).json({
         success: false,
         message: "Invalid wallet address",
       });
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Prevent same wallet from being connected
-    |--------------------------------------------------------------------------
-    */
     const [existing] = await pool.execute(
       `SELECT id, name, email
        FROM users
-       WHERE wallet_address = ?
+       WHERE LOWER(wallet_address) = LOWER(?)
        AND id != ?
        LIMIT 1`,
       [
         wallet,
-        req.user.id,
+        userId,
       ]
     );
 
@@ -132,18 +179,13 @@ const connectWallet = async (req, res) => {
       });
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Save wallet
-    |--------------------------------------------------------------------------
-    */
     await pool.execute(
       `UPDATE users
        SET wallet_address = ?
        WHERE id = ?`,
       [
         wallet,
-        req.user.id,
+        userId,
       ]
     );
 
@@ -154,25 +196,35 @@ const connectWallet = async (req, res) => {
     });
   } catch (error) {
     console.error(
-      "Connect wallet error:",
+      "CONNECT WALLET ERROR:",
       error
     );
 
     return res.status(500).json({
       success: false,
-      message: "Could not connect wallet",
+      message:
+        error.message ||
+        "Could not connect wallet",
     });
   }
 };
 
-/*
-|--------------------------------------------------------------------------
-| MARK ATTENDANCE
-|--------------------------------------------------------------------------
-*/
+/* ============================================================
+   MARK ATTENDANCE
+============================================================ */
+
 const markAttendance = async (req, res) => {
   try {
-    const { qr_token } = req.body;
+    const userId = getUserId(req);
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized",
+      });
+    }
+
+    const { qr_token } = req.body || {};
 
     if (!qr_token) {
       return res.status(400).json({
@@ -181,18 +233,24 @@ const markAttendance = async (req, res) => {
       });
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Find open session
-    |--------------------------------------------------------------------------
-    */
+    const qrToken = String(qr_token).trim();
+
     const [sessions] = await pool.execute(
-      `SELECT *
+      `SELECT
+        id,
+        teacher_id,
+        course_name,
+        session_date,
+        start_time,
+        end_time,
+        qr_token,
+        status,
+        attendance_hash
        FROM attendance_sessions
        WHERE qr_token = ?
        AND status = 'open'
        LIMIT 1`,
-      [qr_token.trim()]
+      [qrToken]
     );
 
     if (sessions.length === 0) {
@@ -205,20 +263,35 @@ const markAttendance = async (req, res) => {
 
     const session = sessions[0];
 
-    /*
-    |--------------------------------------------------------------------------
-    | Check duplicate attendance
-    |--------------------------------------------------------------------------
-    */
+    const role = getUserRole(req);
+
+    if (
+      role &&
+      role !== "student"
+    ) {
+      return res.status(403).json({
+        success: false,
+        message:
+          "Only students can mark attendance",
+      });
+    }
+
     const [existing] = await pool.execute(
-      `SELECT id
+      `SELECT
+        id,
+        session_id,
+        student_id,
+        marked_at,
+        status,
+        blockchain_tx_hash,
+        nft_token_id
        FROM attendance_records
        WHERE session_id = ?
        AND student_id = ?
        LIMIT 1`,
       [
-        session.id,
-        req.user.id,
+        Number(session.id),
+        userId,
       ]
     );
 
@@ -226,14 +299,10 @@ const markAttendance = async (req, res) => {
       return res.status(409).json({
         success: false,
         message: "Attendance already marked",
+        attendance: existing[0],
       });
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Save attendance
-    |--------------------------------------------------------------------------
-    */
     const [result] = await pool.execute(
       `INSERT INTO attendance_records
       (
@@ -243,246 +312,52 @@ const markAttendance = async (req, res) => {
       )
       VALUES (?, ?, 'present')`,
       [
-        session.id,
-        req.user.id,
+        Number(session.id),
+        userId,
       ]
+    );
+
+    const [savedRecords] = await pool.execute(
+      `SELECT
+        a.id AS attendance_id,
+        a.session_id,
+        a.student_id,
+        u.name AS student_name,
+        u.email AS student_email,
+        u.wallet_address,
+        a.marked_at,
+        a.status,
+        a.blockchain_tx_hash AS transaction_hash,
+        a.nft_token_id AS token_id
+       FROM attendance_records a
+       INNER JOIN users u
+         ON a.student_id = u.id
+       WHERE a.id = ?
+       LIMIT 1`,
+      [result.insertId]
     );
 
     return res.status(201).json({
       success: true,
-      message:
-        "Attendance marked successfully",
+      message: "Attendance marked successfully",
 
-      attendance: {
-        id: result.insertId,
-        session_id: session.id,
-        student_id: req.user.id,
-        status: "present",
-      },
+      attendance:
+        savedRecords.length > 0
+          ? savedRecords[0]
+          : {
+              attendance_id: Number(
+                result.insertId
+              ),
+              session_id: Number(
+                session.id
+              ),
+              student_id: userId,
+              status: "present",
+            },
     });
   } catch (error) {
     console.error(
-      "Mark attendance error:",
-      error
-    );
-
-    return res.status(500).json({
-      success: false,
-      message:
-        "Could not mark attendance",
-    });
-  }
-};
-
-/*
-|--------------------------------------------------------------------------
-| PREPARE LOCK SESSION
-|
-| This does NOT send blockchain transactions.
-| It prepares the attendance data for the frontend.
-|--------------------------------------------------------------------------
-*/
-const prepareLockSession = async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    if (!id || isNaN(Number(id))) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid session ID",
-      });
-    }
-
-    const sessionId = Number(id);
-
-    /*
-    |--------------------------------------------------------------------------
-    | Find session
-    |--------------------------------------------------------------------------
-    */
-    let sessions;
-
-    if (req.user.role === "admin") {
-      [sessions] = await pool.execute(
-        `SELECT *
-         FROM attendance_sessions
-         WHERE id = ?
-         LIMIT 1`,
-        [sessionId]
-      );
-    } else {
-      [sessions] = await pool.execute(
-        `SELECT *
-         FROM attendance_sessions
-         WHERE id = ?
-         AND teacher_id = ?
-         LIMIT 1`,
-        [
-          sessionId,
-          req.user.id,
-        ]
-      );
-    }
-
-    if (sessions.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message:
-          "Attendance session not found",
-      });
-    }
-
-    const session = sessions[0];
-
-    /*
-    |--------------------------------------------------------------------------
-    | Check locked status
-    |--------------------------------------------------------------------------
-    */
-    if (session.status === "locked") {
-      return res.status(400).json({
-        success: false,
-        message:
-          "Attendance is already locked",
-      });
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | Get attendance records
-    |--------------------------------------------------------------------------
-    */
-    const [records] = await pool.execute(
-      `SELECT
-        a.id,
-        a.session_id,
-        a.student_id,
-        a.marked_at,
-        a.status,
-
-        u.name AS student_name,
-        u.email AS student_email,
-        u.wallet_address
-
-       FROM attendance_records a
-
-       INNER JOIN users u
-         ON a.student_id = u.id
-
-       WHERE a.session_id = ?
-
-       ORDER BY a.marked_at ASC`,
-      [sessionId]
-    );
-
-    /*
-    |--------------------------------------------------------------------------
-    | Do not lock empty attendance
-    |--------------------------------------------------------------------------
-    */
-    if (records.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message:
-          "Cannot lock session: no attendance records found",
-      });
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | Check wallets
-    |--------------------------------------------------------------------------
-    */
-    for (const record of records) {
-      if (!record.wallet_address) {
-        return res.status(400).json({
-          success: false,
-          message:
-            `Student "${record.student_name}" has not connected a wallet. ` +
-            `Ask the student to connect MetaMask before locking attendance.`,
-        });
-      }
-
-      if (
-        !/^0x[a-fA-F0-9]{40}$/.test(
-          record.wallet_address
-        )
-      ) {
-        return res.status(400).json({
-          success: false,
-          message:
-            `Invalid wallet address for student "${record.student_name}"`,
-        });
-      }
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | Create ONE session attendance hash
-    |--------------------------------------------------------------------------
-    */
-    const attendanceData = JSON.stringify({
-      session_id: sessionId,
-
-      records: records.map((record) => ({
-        id: Number(record.id),
-        session_id: Number(record.session_id),
-        student_id: Number(record.student_id),
-        marked_at: record.marked_at,
-        status: record.status,
-      })),
-    });
-
-    const attendanceHash = crypto
-      .createHash("sha256")
-      .update(attendanceData)
-      .digest("hex");
-
-    /*
-    |--------------------------------------------------------------------------
-    | Create UNIQUE hash for every student
-    |--------------------------------------------------------------------------
-    */
-    const students = records.map((record) => {
-      const studentHash = crypto
-        .createHash("sha256")
-        .update(
-          `${attendanceHash}:${record.id}:${record.student_id}`
-        )
-        .digest("hex");
-
-      return {
-        attendance_id: record.id,
-        student_id: record.student_id,
-        student_name: record.student_name,
-        student_email: record.student_email,
-        wallet_address:
-          record.wallet_address,
-
-        attendance_hash:
-          `0x${studentHash}`,
-
-        metadata_uri:
-          `https://proofattendai.netlify.app/attendance/${sessionId}/${record.student_id}`,
-      };
-    });
-
-    return res.status(200).json({
-      success: true,
-
-      session_id: sessionId,
-
-      attendance_hash:
-        `0x${attendanceHash}`,
-
-      total_students:
-        students.length,
-
-      students,
-    });
-  } catch (error) {
-    console.error(
-      "Prepare lock error:",
+      "MARK ATTENDANCE ERROR:",
       error
     );
 
@@ -490,25 +365,37 @@ const prepareLockSession = async (req, res) => {
       success: false,
       message:
         error.message ||
-        "Could not prepare attendance lock",
+        "Could not mark attendance",
     });
   }
 };
 
-/*
-|--------------------------------------------------------------------------
-| CONFIRM LOCK SESSION
-|
-| Frontend sends confirmed blockchain transactions here.
-|--------------------------------------------------------------------------
-*/
-const confirmLockSession = async (req, res) => {
-  try {
-    const { id } = req.params;
+/* ============================================================
+   PREPARE LOCK SESSION
 
-    const {
-      attendance_hash,
-    } = req.body;
+   IMPORTANT:
+   This function does NOT mint an NFT.
+
+   It:
+   - checks teacher/admin
+   - gets all students
+   - checks wallets
+   - creates session hash
+   - returns complete data to frontend
+============================================================ */
+
+const prepareLockSession = async (req, res) => {
+  try {
+    const userId = getUserId(req);
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized",
+      });
+    }
+
+    const { id } = req.params;
 
     if (!id || isNaN(Number(id))) {
       return res.status(400).json({
@@ -518,22 +405,11 @@ const confirmLockSession = async (req, res) => {
     }
 
     const sessionId = Number(id);
-
-    if (
-      !attendance_hash ||
-      !/^0x[a-fA-F0-9]{64}$/.test(
-        attendance_hash
-      )
-    ) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid attendance hash",
-      });
-    }
+    const role = getUserRole(req);
 
     let sessions;
 
-    if (req.user.role === "admin") {
+    if (role === "admin") {
       [sessions] = await pool.execute(
         `SELECT *
          FROM attendance_sessions
@@ -550,7 +426,7 @@ const confirmLockSession = async (req, res) => {
          LIMIT 1`,
         [
           sessionId,
-          req.user.id,
+          userId,
         ]
       );
     }
@@ -571,12 +447,6 @@ const confirmLockSession = async (req, res) => {
       });
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | GET ATTENDANCE RECORDS + STUDENT WALLETS
-    |--------------------------------------------------------------------------
-    */
-
     const [records] = await pool.execute(
       `SELECT
         a.id,
@@ -584,18 +454,13 @@ const confirmLockSession = async (req, res) => {
         a.student_id,
         a.marked_at,
         a.status,
-
         u.name AS student_name,
         u.email AS student_email,
         u.wallet_address
-
        FROM attendance_records a
-
        INNER JOIN users u
          ON a.student_id = u.id
-
        WHERE a.session_id = ?
-
        ORDER BY a.marked_at ASC`,
       [sessionId]
     );
@@ -603,27 +468,23 @@ const confirmLockSession = async (req, res) => {
     if (records.length === 0) {
       return res.status(400).json({
         success: false,
-        message: "No attendance records found",
+        message:
+          "Cannot lock session: no attendance records found",
       });
     }
-
-    /*
-    |--------------------------------------------------------------------------
-    | VALIDATE STUDENT WALLETS
-    |--------------------------------------------------------------------------
-    */
 
     for (const record of records) {
       if (!record.wallet_address) {
         return res.status(400).json({
           success: false,
           message:
-            `Student "${record.student_name}" has not connected a wallet.`,
+            `Student "${record.student_name}" has not connected a wallet. ` +
+            `Ask the student to connect MetaMask before locking attendance.`,
         });
       }
 
       if (
-        !/^0x[a-fA-F0-9]{40}$/.test(
+        !isValidWalletAddress(
           record.wallet_address
         )
       ) {
@@ -635,19 +496,258 @@ const confirmLockSession = async (req, res) => {
       }
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | VERIFY ATTENDANCE HASH
-    |--------------------------------------------------------------------------
-    */
+    const attendanceData = JSON.stringify({
+      session_id: sessionId,
+
+      records: records.map((record) => ({
+        id: Number(record.id),
+        session_id: Number(
+          record.session_id
+        ),
+        student_id: Number(
+          record.student_id
+        ),
+        marked_at: record.marked_at,
+        status: record.status,
+      })),
+    });
+
+    const attendanceHash = crypto
+      .createHash("sha256")
+      .update(attendanceData)
+      .digest("hex");
+
+    const students = records.map(
+      (record) => {
+        const studentHash = crypto
+          .createHash("sha256")
+          .update(
+            `${attendanceHash}:${record.id}:${record.student_id}`
+          )
+          .digest("hex");
+
+        return {
+          attendance_id: Number(
+            record.id
+          ),
+
+          student_id: Number(
+            record.student_id
+          ),
+
+          student_name:
+            record.student_name,
+
+          student_email:
+            record.student_email,
+
+          wallet_address:
+            record.wallet_address,
+
+          attendance_hash:
+            `0x${studentHash}`,
+
+          metadata_uri:
+            `https://proofattendai.netlify.app/attendance/${sessionId}/${record.student_id}`,
+        };
+      }
+    );
+
+    return res.status(200).json({
+      success: true,
+
+      session_id: sessionId,
+
+      course_name:
+        session.course_name,
+
+      session_date:
+        session.session_date,
+
+      start_time:
+        session.start_time,
+
+      end_time:
+        session.end_time,
+
+      status:
+        session.status,
+
+      attendance_hash:
+        `0x${attendanceHash}`,
+
+      total_students:
+        students.length,
+
+      students,
+    });
+  } catch (error) {
+    console.error(
+      "PREPARE LOCK ERROR:",
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      message:
+        error.message ||
+        "Could not prepare attendance lock",
+    });
+  }
+};
+
+/* ============================================================
+   CONFIRM LOCK SESSION
+
+   This is the backend NFT-minting flow.
+
+   IMPORTANT:
+   mintAttendanceNFT() must be correctly configured in
+   blockchainService.js.
+============================================================ */
+
+const confirmLockSession = async (req, res) => {
+  try {
+    const userId = getUserId(req);
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized",
+      });
+    }
+
+    const { id } = req.params;
+    const { attendance_hash } = req.body || {};
+
+    if (!id || isNaN(Number(id))) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid session ID",
+      });
+    }
+
+    const sessionId = Number(id);
+
+    if (!attendance_hash) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Attendance hash is required",
+      });
+    }
+
+    if (!isValidHash(attendance_hash)) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Invalid attendance hash",
+      });
+    }
+
+    const role = getUserRole(req);
+
+    let sessions;
+
+    if (role === "admin") {
+      [sessions] = await pool.execute(
+        `SELECT *
+         FROM attendance_sessions
+         WHERE id = ?
+         LIMIT 1`,
+        [sessionId]
+      );
+    } else {
+      [sessions] = await pool.execute(
+        `SELECT *
+         FROM attendance_sessions
+         WHERE id = ?
+         AND teacher_id = ?
+         LIMIT 1`,
+        [
+          sessionId,
+          userId,
+        ]
+      );
+    }
+
+    if (sessions.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message:
+          "Attendance session not found",
+      });
+    }
+
+    const session = sessions[0];
+
+    if (session.status === "locked") {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Attendance is already locked",
+      });
+    }
+
+    const [records] = await pool.execute(
+      `SELECT
+        a.id,
+        a.session_id,
+        a.student_id,
+        a.marked_at,
+        a.status,
+        u.name AS student_name,
+        u.email AS student_email,
+        u.wallet_address
+       FROM attendance_records a
+       INNER JOIN users u
+         ON a.student_id = u.id
+       WHERE a.session_id = ?
+       ORDER BY a.marked_at ASC`,
+      [sessionId]
+    );
+
+    if (records.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "No attendance records found",
+      });
+    }
+
+    for (const record of records) {
+      if (!record.wallet_address) {
+        return res.status(400).json({
+          success: false,
+          message:
+            `Student "${record.student_name}" has not connected a wallet.`,
+        });
+      }
+
+      if (
+        !isValidWalletAddress(
+          record.wallet_address
+        )
+      ) {
+        return res.status(400).json({
+          success: false,
+          message:
+            `Invalid wallet address for student "${record.student_name}"`,
+        });
+      }
+    }
 
     const attendanceData = JSON.stringify({
       session_id: sessionId,
 
       records: records.map((record) => ({
         id: Number(record.id),
-        session_id: Number(record.session_id),
-        student_id: Number(record.student_id),
+        session_id: Number(
+          record.session_id
+        ),
+        student_id: Number(
+          record.student_id
+        ),
         marked_at: record.marked_at,
         status: record.status,
       })),
@@ -664,19 +764,56 @@ const confirmLockSession = async (req, res) => {
 
     if (
       calculatedHash.toLowerCase() !==
-      attendance_hash.toLowerCase()
+      String(attendance_hash).toLowerCase()
     ) {
       return res.status(400).json({
         success: false,
         message:
           "Attendance hash does not match prepared attendance data",
+
+        expected_hash:
+          calculatedHash,
       });
     }
 
     /*
-    |--------------------------------------------------------------------------
-    | MINT NFT FOR EACH STUDENT
-    |--------------------------------------------------------------------------
+    ------------------------------------------------------------
+    Prevent locking if another request already locked it
+    ------------------------------------------------------------
+    */
+
+    const [currentSession] =
+      await pool.execute(
+        `SELECT id, status
+         FROM attendance_sessions
+         WHERE id = ?
+         LIMIT 1`,
+        [sessionId]
+      );
+
+    if (currentSession.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message:
+          "Attendance session not found",
+      });
+    }
+
+    if (
+      currentSession[0].status !==
+      "open"
+    ) {
+      return res.status(409).json({
+        success: false,
+        message:
+          "Attendance session is no longer open",
+      });
+    }
+
+    /*
+    ------------------------------------------------------------
+    MINT NFT FOR EACH STUDENT
+    ------------------------------------------------------------
     */
 
     const blockchainRecords = [];
@@ -697,68 +834,163 @@ const confirmLockSession = async (req, res) => {
         `https://proofattendai.netlify.app/attendance/${sessionId}/${record.student_id}`;
 
       console.log(
-        `Minting NFT for student ${record.student_id}...`
+        `[LOCK] Minting NFT for student ${record.student_id}`
       );
 
-      const mintResult =
-        await mintAttendanceNFT(
-          record.wallet_address,
-          sessionId,
-          studentAttendanceHash,
-          metadataURI
+      console.log(
+        `[LOCK] Wallet: ${record.wallet_address}`
+      );
+
+      let mintResult;
+
+      try {
+        mintResult =
+          await mintAttendanceNFT(
+            record.wallet_address,
+            sessionId,
+            studentAttendanceHash,
+            metadataURI
+          );
+      } catch (blockchainError) {
+        console.error(
+          "[LOCK] Blockchain error:",
+          blockchainError
         );
+
+        return res.status(500).json({
+          success: false,
+
+          message:
+            `Blockchain NFT mint failed for student "${record.student_name}"`,
+
+          student_id:
+            Number(record.student_id),
+
+          student_name:
+            record.student_name,
+
+          error:
+            blockchainError.message ||
+            "Blockchain transaction failed",
+        });
+      }
 
       if (
         !mintResult ||
         !mintResult.transactionHash ||
-        mintResult.tokenId === undefined ||
+        mintResult.tokenId ===
+          undefined ||
         mintResult.tokenId === null
       ) {
-        throw new Error(
-          `NFT mint failed for student ${record.student_id}`
-        );
+        return res.status(500).json({
+          success: false,
+
+          message:
+            `NFT mint failed for student "${record.student_name}"`,
+
+          student_id:
+            Number(record.student_id),
+        });
       }
 
+      let tokenId =
+        mintResult.tokenId;
+
+      if (
+        typeof tokenId === "object" &&
+        tokenId !== null
+      ) {
+        tokenId =
+          tokenId.toString();
+      }
+
+      tokenId = String(tokenId);
+
       /*
-      |--------------------------------------------------------------------------
-      | SAVE NFT DATA IN MYSQL
-      |--------------------------------------------------------------------------
+      ------------------------------------------------------------
+      SAVE BLOCKCHAIN DATA TO MYSQL
+      ------------------------------------------------------------
       */
 
-      await pool.execute(
-        `UPDATE attendance_records
-         SET
-           blockchain_tx_hash = ?,
-           nft_token_id = ?
-         WHERE id = ?
-         AND session_id = ?`,
-        [
-          mintResult.transactionHash,
-          mintResult.tokenId,
-          record.id,
-          sessionId,
-        ]
-      );
+      const [updateResult] =
+        await pool.execute(
+          `UPDATE attendance_records
+           SET
+             blockchain_tx_hash = ?,
+             nft_token_id = ?
+           WHERE id = ?
+           AND session_id = ?`,
+          [
+            mintResult.transactionHash,
+            tokenId,
+            Number(record.id),
+            sessionId,
+          ]
+        );
+
+      if (
+        !updateResult ||
+        updateResult.affectedRows === 0
+      ) {
+        return res.status(500).json({
+          success: false,
+
+          message:
+            `Blockchain transaction succeeded but attendance record could not be updated for "${record.student_name}"`,
+
+          student_id:
+            Number(record.student_id),
+
+          transaction_hash:
+            mintResult.transactionHash,
+
+          token_id:
+            tokenId,
+        });
+      }
 
       blockchainRecords.push({
-        attendance_id: record.id,
-        student_id: record.student_id,
-        student_name: record.student_name,
-        student_email: record.student_email,
-        wallet_address: record.wallet_address,
+        attendance_id:
+          Number(record.id),
+
+        session_id:
+          sessionId,
+
+        student_id:
+          Number(record.student_id),
+
+        student_name:
+          record.student_name,
+
+        student_email:
+          record.student_email,
+
+        wallet_address:
+          record.wallet_address,
+
+        attendance_hash:
+          studentAttendanceHash,
+
+        metadata_uri:
+          metadataURI,
 
         transaction_hash:
           mintResult.transactionHash,
 
         token_id:
-          mintResult.tokenId,
+          tokenId,
       });
+
+      console.log(
+        `[LOCK] NFT successfully minted for student ${record.student_id}`
+      );
     }
 
     /*
-    |--------------------------------------------------------------------------
-    | LOCK SQL SESSION
-    |--------------------------------------------------------------------------
+    ------------------------------------------------------------
+    ALL NFTS SUCCESSFUL
+    NOW LOCK MYSQL SESSION
+    ------------------------------------------------------------
     */
 
     const [lockResult] =
@@ -776,24 +1008,35 @@ const confirmLockSession = async (req, res) => {
         ]
       );
 
-    if (lockResult.affectedRows === 0) {
+    if (
+      !lockResult ||
+      lockResult.affectedRows === 0
+    ) {
       return res.status(409).json({
         success: false,
+
         message:
-          "Session could not be locked because its status changed",
+          "Blockchain records were created, but the attendance session could not be locked.",
+
+        session_id:
+          sessionId,
+
+        blockchain:
+          blockchainRecords,
       });
     }
 
     /*
-    |--------------------------------------------------------------------------
-    | GET FINAL RECORDS
-    |--------------------------------------------------------------------------
+    ------------------------------------------------------------
+    GET FINAL RECORDS
+    ------------------------------------------------------------
     */
 
     const [finalRecords] =
       await pool.execute(
         `SELECT
           a.id AS attendance_id,
+          a.session_id,
           a.student_id,
 
           u.name AS student_name,
@@ -823,7 +1066,17 @@ const confirmLockSession = async (req, res) => {
       message:
         "Attendance locked and blockchain records saved successfully",
 
-      session_id: sessionId,
+      session_id:
+        sessionId,
+
+      course_name:
+        session.course_name,
+
+      session_date:
+        session.session_date,
+
+      start_time:
+        session.start_time,
 
       attendance_hash:
         calculatedHash,
@@ -834,10 +1087,9 @@ const confirmLockSession = async (req, res) => {
       blockchain:
         finalRecords,
     });
-
   } catch (error) {
     console.error(
-      "Confirm lock error:",
+      "CONFIRM LOCK ERROR:",
       error
     );
 
@@ -850,13 +1102,229 @@ const confirmLockSession = async (req, res) => {
   }
 };
 
+/* ============================================================
+   GET SESSION / SHOW RECORD
+============================================================ */
 
+const getSession = async (req, res) => {
+  try {
+    const userId = getUserId(req);
 
-/*
-|--------------------------------------------------------------------------
-| EXPORT CONTROLLERS
-|--------------------------------------------------------------------------
-*/
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized",
+      });
+    }
+
+    const { id } = req.params;
+
+    if (!id || isNaN(Number(id))) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid session ID",
+      });
+    }
+
+    const sessionId = Number(id);
+    const role = getUserRole(req);
+
+    /*
+    ------------------------------------------------------------
+    GET SESSION
+    ------------------------------------------------------------
+    */
+
+    const [sessions] =
+      await pool.execute(
+        `SELECT
+          s.id,
+          s.teacher_id,
+          s.course_name,
+          s.session_date,
+          s.start_time,
+          s.end_time,
+          s.qr_token,
+          s.status,
+          s.attendance_hash,
+          COUNT(a.id) AS total_attendance
+
+         FROM attendance_sessions s
+
+         LEFT JOIN attendance_records a
+           ON s.id = a.session_id
+
+         WHERE s.id = ?
+
+         GROUP BY
+           s.id,
+           s.teacher_id,
+           s.course_name,
+           s.session_date,
+           s.start_time,
+           s.end_time,
+           s.qr_token,
+           s.status,
+           s.attendance_hash`,
+        [sessionId]
+      );
+
+    if (sessions.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Session not found",
+      });
+    }
+
+    const session =
+      sessions[0];
+
+    /*
+    ------------------------------------------------------------
+    AUTHORIZATION
+    ------------------------------------------------------------
+    */
+
+    if (role === "admin") {
+      // Admin can view all sessions.
+    } else if (role === "teacher") {
+      if (
+        Number(session.teacher_id) !==
+        userId
+      ) {
+        return res.status(403).json({
+          success: false,
+          message:
+            "You are not authorized to view this session",
+        });
+      }
+    } else if (role === "student") {
+      const [studentAttendance] =
+        await pool.execute(
+          `SELECT id
+           FROM attendance_records
+           WHERE session_id = ?
+           AND student_id = ?
+           LIMIT 1`,
+          [
+            sessionId,
+            userId,
+          ]
+        );
+
+      if (
+        studentAttendance.length ===
+        0
+      ) {
+        return res.status(403).json({
+          success: false,
+          message:
+            "You are not authorized to view this attendance session",
+        });
+      }
+    }
+
+    /*
+    ------------------------------------------------------------
+    GET ALL ATTENDANCE RECORDS
+    ------------------------------------------------------------
+    */
+
+    const [records] =
+      await pool.execute(
+        `SELECT
+          a.id AS attendance_id,
+          a.session_id,
+          a.student_id,
+
+          u.name AS student_name,
+          u.email AS student_email,
+          u.wallet_address,
+
+          a.marked_at,
+          a.status,
+
+          a.blockchain_tx_hash AS transaction_hash,
+          a.nft_token_id AS token_id
+
+         FROM attendance_records a
+
+         INNER JOIN users u
+           ON a.student_id = u.id
+
+         WHERE a.session_id = ?
+
+         ORDER BY a.marked_at ASC`,
+        [sessionId]
+      );
+
+    /*
+    ------------------------------------------------------------
+    RETURN COMPLETE SESSION
+    ------------------------------------------------------------
+    */
+
+    return res.status(200).json({
+      success: true,
+
+      session: {
+        id:
+          Number(session.id),
+
+        teacher_id:
+          Number(session.teacher_id),
+
+        course_name:
+          session.course_name,
+
+        session_date:
+          session.session_date,
+
+        start_time:
+          session.start_time,
+
+        end_time:
+          session.end_time,
+
+        qr_token:
+          session.qr_token,
+
+        status:
+          session.status,
+
+        attendance_hash:
+          session.attendance_hash,
+
+        total_attendance:
+          Number(
+            session.total_attendance
+          ),
+      },
+
+      total_records:
+        records.length,
+
+      records,
+    });
+  } catch (error) {
+    console.error(
+      "GET SESSION ERROR:",
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      message:
+        error.message ||
+        "Could not retrieve session",
+    });
+  }
+};
+
+/* ============================================================
+   EXPORTS
+============================================================ */
+
 module.exports = {
   createSession,
   connectWallet,
