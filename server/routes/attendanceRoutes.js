@@ -30,13 +30,16 @@ router.post(
 
 /*
 |--------------------------------------------------------------------------
-| CONNECT STUDENT WALLET
+| CONNECT WALLET
 |--------------------------------------------------------------------------
+|
+| Both students and teachers can connect their wallet.
+|
 */
 router.post(
   "/wallet/connect",
   protect,
-  authorize("student"),
+  authorize("student", "teacher", "admin"),
   connectWallet
 );
 
@@ -56,9 +59,6 @@ router.post(
 |--------------------------------------------------------------------------
 | PREPARE LOCK
 |--------------------------------------------------------------------------
-| Backend calculates the attendance hash.
-| No blockchain transaction is sent here.
-|--------------------------------------------------------------------------
 */
 router.post(
   "/sessions/:id/lock/prepare",
@@ -70,8 +70,6 @@ router.post(
 /*
 |--------------------------------------------------------------------------
 | CONFIRM LOCK
-|--------------------------------------------------------------------------
-| Frontend sends confirmed blockchain transaction records here.
 |--------------------------------------------------------------------------
 */
 router.post(
